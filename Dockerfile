@@ -5,7 +5,8 @@ WORKDIR /code
 # Install stable packages from CRAN
 RUN install2.r --error \
     ggExtra \
-    shiny
+    shiny \
+    highcharter
 
 # Install development packages from GitHub
 RUN installGithub.r \
