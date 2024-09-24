@@ -2,8 +2,21 @@ library(shiny)
 library(bslib)
 library(dplyr)
 library(ggplot2)
+library(reticulate)
 
-df <- readr::read_csv("penguins.csv")
+# Python code to read the CSV file using Polars
+py_run_string("
+import polars as pl
+df = pl.read_csv('https://datasets.alexdum/test/penguins.csv')
+")
+
+# Convert the Polars DataFrame to an R DataFrame
+df <- py$df$to_pandas()
+
+# Convert the Polars DataFrame to an R DataFrame
+df <- p
+
+#df <- readr::read_csv("penguins.csv")
 # Find subset of columns that are suitable for scatter plot
 df_num <- df |> select(where(is.numeric), -Year)
 
