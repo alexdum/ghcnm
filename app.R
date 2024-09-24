@@ -4,14 +4,17 @@ library(dplyr)
 library(ggplot2)
 library(reticulate)
 
+# Define custom path for virtual environment
+custom_env_path <- "~/r-reticulate-env"
 
 # Create and use the virtual environment for Python
-if (!reticulate::virtualenv_exists('r-reticulate')) {
-  reticulate::virtualenv_create('r-reticulate')
+if (!reticulate::virtualenv_exists(custom_env_path)) {
+  reticulate::virtualenv_create(custom_env_path)
   # Install any required Python packages
-  reticulate::virtualenv_install('r-reticulate', packages = c('numpy', 'pandas', 'polars'))  # Add other packages as needed
+  reticulate::virtualenv_install(custom_env_path, packages = c('numpy', 'pandas', 'polars'))  # Add other packages as needed
 }
-reticulate::use_virtualenv('r-reticulate')
+reticulate::use_virtualenv(custom_env_path)
+
 
 
 # Python code to read the CSV file using Polars
