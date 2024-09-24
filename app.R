@@ -4,6 +4,16 @@ library(dplyr)
 library(ggplot2)
 library(reticulate)
 
+
+# Create and use the virtual environment for Python
+if (!reticulate::virtualenv_exists('r-reticulate')) {
+  reticulate::virtualenv_create('r-reticulate')
+  # Install any required Python packages
+  reticulate::virtualenv_install('r-reticulate', packages = c('numpy', 'pandas', 'polars'))  # Add other packages as needed
+}
+reticulate::use_virtualenv('r-reticulate')
+
+
 # Python code to read the CSV file using Polars
 py_run_string("
 import polars as pl
