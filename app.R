@@ -5,8 +5,6 @@ library(ggplot2)
 library(reticulate)
 
 
-print(reticulate::py_config())
-
 
 df <- readr::read_csv("penguins.csv")
 # Find subset of columns that are suitable for scatter plot
