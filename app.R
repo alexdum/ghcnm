@@ -13,7 +13,12 @@ if (!reticulate::virtualenv_exists(custom_env_path)) {
   # Install any required Python packages
   reticulate::virtualenv_install(custom_env_path, packages = c('numpy', 'pandas', 'polars'))  # Add other packages as needed
 }
+
+# Use the custom virtual environment
 reticulate::use_virtualenv(custom_env_path)
+
+# Check Python configuration (optional but useful for debugging)
+reticulate::py_config()
 
 
 
