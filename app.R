@@ -5,36 +5,35 @@ library(ggplot2)
 library(reticulate)
 
 # Define custom path for virtual environment
-custom_env_path <- "~/r-reticulate-env"
+#custom_env_path <- "~/r-reticulate-env"
 
 # Create and use the virtual environment for Python
-if (!reticulate::virtualenv_exists(custom_env_path)) {
-  reticulate::virtualenv_create(custom_env_path)
+#if (!reticulate::virtualenv_exists(custom_env_path)) {
+#  reticulate::virtualenv_create(custom_env_path)
   # Install any required Python packages
-  reticulate::virtualenv_install(custom_env_path, packages = c('numpy', 'pandas', 'polars'))  # Add other packages as needed
-}
+#  reticulate::virtualenv_install(custom_env_path, packages = c('numpy', 'pandas', 'polars'))  # Add other packages as needed
+#}
 
 # Use the custom virtual environment
-reticulate::use_virtualenv(custom_env_path)
+#reticulate::use_virtualenv(custom_env_path)
 
 # Check Python configuration (optional but useful for debugging)
-reticulate::py_config()
+print(reticulate::py_config())
 
 
 
 # Python code to read the CSV file using Polars
-py_run_string("
-import polars as pl
-df = pl.read_csv('https://datasets.alexdum/test/penguins.csv')
-")
+#py_run_string("
+#import polars as pl
+#df = pl.read_csv('https://datasets.alexdum/test/penguins.csv')
+#")
 
 # Convert the Polars DataFrame to an R DataFrame
-df <- py$df$to_pandas()
+#df <- py$df$to_pandas()
 
-# Convert the Polars DataFrame to an R DataFrame
-df <- p
 
-#df <- readr::read_csv("penguins.csv")
+
+df <- readr::read_csv("penguins.csv")
 # Find subset of columns that are suitable for scatter plot
 df_num <- df |> select(where(is.numeric), -Year)
 
