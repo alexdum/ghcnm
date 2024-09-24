@@ -9,7 +9,7 @@ df_num <- df |> select(where(is.numeric), -Year)
 
 ui <- page_sidebar(
   theme = bs_theme(bootswatch = "minty"),
-  title = "Penguins explorer",
+  #title = "Penguins explorer",
   sidebar = sidebar(
     varSelectInput("xvar", "X variable", df_num, selected = "Bill Length (mm)"),
     varSelectInput("yvar", "Y variable", df_num, selected = "Bill Depth (mm)"),
