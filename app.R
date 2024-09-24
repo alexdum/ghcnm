@@ -6,7 +6,7 @@ library(reticulate)
 
 
 
-df <- readr::read_csv("penguins.csv")
+df <- readr::read_csv("hf://datasets/alexdum/test/penguins.csv")
 # Find subset of columns that are suitable for scatter plot
 df_num <- df |> select(where(is.numeric), -Year)
 
