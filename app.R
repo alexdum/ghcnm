@@ -5,8 +5,15 @@ library(ggplot2)
 library(reticulate)
 
 
+# Read the CSV directly from the URL
+url <- "https://huggingface.co/datasets/alexdum/test/resolve/main/penguins.csv"
+df <- read.csv(url)
 
-df <- readr::read_csv("hf://datasets/alexdum/test/penguins.csv")
+# View the first few rows of the dataset
+
+
+
+#df <- readr::read_csv("hf://datasets/alexdum/test/penguins.csv")
 # Find subset of columns that are suitable for scatter plot
 df_num <- df |> select(where(is.numeric), -Year)
 
