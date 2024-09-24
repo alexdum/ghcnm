@@ -5,11 +5,7 @@ library(ggplot2)
 library(reticulate)
 
 
-
-reticulate::virtualenv_create('r-reticulate')
 print(reticulate::py_config())
-
-
 
 
 df <- readr::read_csv("penguins.csv")
