@@ -7,7 +7,10 @@ RUN install2.r --error \
     ggExtra \
     shiny \
     highcharter \
-    arrow
+    arrow \
+    leaflet \
+    leaflet.extras \
+    bslib
 
 # Install development packages from GitHub
 RUN installGithub.r \
