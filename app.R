@@ -7,7 +7,6 @@ library(leaflet.extras)
 library(arrow) # For reading Parquet files
 library(scales) # For color scaling
 
-
 # Read the metadata and availability data
 tavg_meta <- read.csv("www/data/tabs/tavg_meta.csv")
 tavg_avail <- read.csv("www/data/tabs/tavg_vaialability.csv")
