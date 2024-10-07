@@ -32,7 +32,7 @@ ui <- page_sidebar(
     sliderInput("year_range", "Select Year Range (First Year - Last Year):",
                 min = min(stations_data$first_year, na.rm = TRUE),
                 max = max(stations_data$last_year, na.rm = TRUE),
-                value = c(min(stations_data$first_year, na.rm = TRUE), 
+                value = c(1961, 
                           max(stations_data$last_year, na.rm = TRUE)),
                 step = 1,
                 sep = ""),
