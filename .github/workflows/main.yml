@@ -1,0 +1,63 @@
+name: Sync to Hugging Face Hub
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout the repository with full history and LFS support
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      # Step 2: Configure Git User (necessary for commits)
+      - name: Configure Git User
+        run: |
+          git config --global user.email "alexandru.dumitrescu@gmail.com"
+          git config --global user.name "alexdum"
+
+      # Step 3a: Track .nc Files with Git LFS if not already tracked
+      - name: Track .csv Files with Git LFS
+        run: |
+          if ! grep -q "*.csv" .gitattributes; then
+            git lfs track "*.csv"
+            git add .gitattributes
+            git commit -m "Configure Git LFS for all .csv files"
+          fi
+    # Step 3b: Track .parquet Files with Git LFS if not already tracked
+      - name: Track .parquet Files with Git LFS
+        run: |
+          if ! grep -q "*.parquet" .gitattributes; then
+            git lfs track "*.parquet"
+            git add .gitattributes
+            git commit -m "Configure Git LFS for all .parquet files"
+          fi
+
+      # Step 4: Add and Commit Any LFS-tracked Files (only if there are changes)
+      - name: Add and Commit LFS-tracked Files
+        run: |
+          git add .
+          git diff-index --quiet HEAD || git commit -m "Move .nc files to Git LFS"
+
+      # Step 5: Verify LFS Tracking
+      - name: Verify LFS Tracking
+        run: git lfs ls-files
+
+      # Step 6: Add Hugging Face Remote
+      - name: Add Hugging Face Remote
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git remote add hf https://alexdum:${HF_TOKEN}@huggingface.co/spaces/alexdum/ghcnm
+
+      # Step 7: Force Push to Hugging Face Hub
+      - name: Force Push to Hugging Face Hub
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git push hf main --force
