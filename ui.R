@@ -24,9 +24,13 @@ ui <- page_navbar(
         selectInput("month", "Select Month:",
                     choices = month.name, selected = month.name[1])
       ),
-      
-      # Main panel content
-      leafletOutput("station_map", height = "90vh")
+      card(
+        full_screen = TRUE,
+        
+        h6("Multiannnual mean"),
+        # Main panel content
+        leafletOutput("station_map", height = "90vh")
+      )
     )
   )
 )
