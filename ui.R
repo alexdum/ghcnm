@@ -12,7 +12,7 @@ ui <- page_navbar(
       sidebar = sidebar(
         open = list(desktop = "open", mobile = "always-above"),
         # Slider for selecting a range of years (first_year and last_year)
-        sliderInput("year_range", "Select Year Range (First Year - Last Year):",
+        sliderInput("year_range", "Select Year Range:",
                     min = min(stations_data$first_year, na.rm = TRUE),
                     max = max(stations_data$last_year, na.rm = TRUE),
                     value = c(1961, 
