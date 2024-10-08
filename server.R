@@ -1,53 +1,6 @@
-# Load necessary libraries
-library(shiny)
-library(leaflet)
-library(dplyr)
-library(bslib)
-library(leaflet.extras)
-library(arrow) # For reading Parquet files
-library(scales) # For color scaling
-
-# Read the metadata and availability data
-tavg_meta <- read.csv("www/data/tabs/tavg_meta.csv")
-tavg_avail <- read.csv("www/data/tabs/tavg_vaialability.csv")
-
-# Merge the metadata and availability data on 'ID'
-stations_data <- merge(tavg_meta, tavg_avail, by = "ID")
-
-# Open the Parquet dataset using arrow
-tavg_dataset <- open_dataset("www/data/tabs/tavg_long.parquet")
-
-# Create a bootstrap 5 theme using bslib
-my_theme <- bs_theme(version = 5, bootswatch = "cosmo")
-
-# Define the UI using bslib's page_sidebar layout
-ui <- page_sidebar(
-  theme = my_theme,
-  
-  # Sidebar content
-  sidebar = sidebar(
-    title = "Filter Options",
-    
-    # Slider for selecting a range of years (first_year and last_year)
-    sliderInput("year_range", "Select Year Range (First Year - Last Year):",
-                min = min(stations_data$first_year, na.rm = TRUE),
-                max = max(stations_data$last_year, na.rm = TRUE),
-                value = c(1961, 
-                          max(stations_data$last_year, na.rm = TRUE)),
-                step = 1,
-                sep = ""),
-    
-    # Select input for choosing a month
-    selectInput("month", "Select Month:",
-                choices = month.name, selected = month.name[1])
-  ),
-  
-  # Main panel content
-  leafletOutput("station_map", height = "90vh")
-)
 
 # Define the server logic
-server <- function(input, output, session) {
+shinyServer(function(input, output, session) {
   
   # Reactive expression to filter the Parquet data by year and month
   filtered_parquet_data <- reactive({
@@ -127,7 +80,6 @@ server <- function(input, output, session) {
         )
     }
   })
-}
+  
+})
 
-# Run the application
-shinyApp(ui = ui, server = server)
