@@ -62,6 +62,7 @@ shinyServer(function(input, output, session) {
     # Define a bin-based color palette for temperature values
     bins <- 6  # Specify the number of bins
     qpal <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = F)
+    qpal2 <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = T)
     
     leafletProxy("station_map", data = data) %>%
       clearMarkers() %>%
@@ -73,7 +74,7 @@ shinyServer(function(input, output, session) {
                                       "First Year:", input$year_range[1], "<br>",
                                       "Last Year:", input$year_range[2], "<br>",
                                       "Mean Temp:", round(mean_temp, 2), "°C"),
-                       color = ~qpal(mean_temp), fillOpacity = 0.7) %>%
+                       color = ~qpal2(mean_temp), fillOpacity = 0.7) %>%
       clearControls() %>%
       addLegend(position = "bottomright",  # Position the legend at the lower right
                 pal = qpal,                # Use the previously defined color palette
