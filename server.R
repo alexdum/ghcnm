@@ -56,14 +56,12 @@ shinyServer(function(input, output, session) {
       )
   })
   
-  # Observe filtered data and update the map
   observe({
     data <- filtered_stations()
     
-    # Define a color scale for temperature values
-    color_palette <- colorRampPalette(c("blue", "white", "red"))(100)
-    temp_colors <- scales::rescale(data$mean_temp, to = c(1, 100), from = range(data$mean_temp, na.rm = TRUE))
-    circle_colors <- color_palette[temp_colors]
+    # Define a bin-based color palette for temperature values
+    bins <- 6  # Specify the number of bins
+    qpal <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = F)
     
     leafletProxy("station_map", data = data) %>%
       clearMarkers() %>%
@@ -72,11 +70,19 @@ shinyServer(function(input, output, session) {
                        popup = ~paste("Station:", NAME, "<br>",
                                       "ID:", ID, "<br>",
                                       "Elevation:", STNELEV, "m<br>",
-                                      "First Year:", first_year, "<br>",
-                                      "Last Year:", last_year, "<br>",
+                                      "First Year:", input$year_range[1], "<br>",
+                                      "Last Year:", input$year_range[2], "<br>",
                                       "Mean Temp:", round(mean_temp, 2), "°C"),
-                       color = circle_colors, fillOpacity = 0.7)
-    
+                       color = ~qpal(mean_temp), fillOpacity = 0.7) %>%
+      clearControls() %>%
+      addLegend(position = "bottomright",  # Position the legend at the lower right
+                pal = qpal,                # Use the previously defined color palette
+                values = data$mean_temp,    # The values to map to the color scale
+                title = htmltools::HTML("<div style='text-align: center;'>°C</div>"),  # Align title to the left using HTML
+                opacity = 0.7,             # Set opacity of the legend
+                na.label = "No data",
+                labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE))
+                )            # Reverse the order of intervals in the legend
   })
   
 })
