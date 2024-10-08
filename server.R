@@ -76,7 +76,7 @@ shinyServer(function(input, output, session) {
                                       "Mean Temp:", round(mean_temp, 2), "°C"),
                        color = ~qpal2(mean_temp), fillOpacity = 0.7) %>%
       clearControls() %>%
-      addLegend(position = "bottomright",  # Position the legend at the lower right
+      addLegend(position = "bottomleft",  # Position the legend at the lower right
                 pal = qpal,                # Use the previously defined color palette
                 values = data$mean_temp,    # The values to map to the color scale
                 title = htmltools::HTML("<div style='text-align: center;'>°C</div>"),  # Align title to the left using HTML
