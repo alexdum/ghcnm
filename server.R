@@ -8,9 +8,11 @@ shinyServer(function(input, output, session) {
     
     # Filter the dataset using arrow's dplyr interface
     tavg_dataset %>%
-      filter(YEAR >= input$year_range[1],
-             YEAR <= input$year_range[2],
-             MONTH == month_number) %>%
+      filter(
+        VALUE >= -90,
+        YEAR >= input$year_range[1],
+        YEAR <= input$year_range[2],
+        MONTH == month_number) %>%
       group_by(ID) %>%
       summarize(mean_temp = mean(VALUE, na.rm = TRUE)) %>%
       collect() # Collect only the filtered and summarized data
