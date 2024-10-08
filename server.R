@@ -37,8 +37,14 @@ shinyServer(function(input, output, session) {
   # Render the Leaflet map
   output$station_map <- renderLeaflet({
     leaflet() %>%
-      addTiles() %>%
+      addTiles(group = "OpenStreetMap") %>%  # Default OpenStreetMap
+      addProviderTiles(providers$Esri.WorldTopoMap, group = "Esri World Topo Map") %>%
+      addProviderTiles(providers$Esri.WorldImagery, group = "Esri World Imagery") %>%
       setView(lng = initial_lng, lat = initial_lat, zoom = initial_zoom) %>%
+      addLayersControl(
+        baseGroups = c("Esri World Topo Map", "OpenStreetMap", "Esri World Imagery"),
+        options = layersControlOptions(collapsed = T) 
+      ) %>%
       # Add a home button
       addEasyButton(
         easyButton(
@@ -71,16 +77,6 @@ shinyServer(function(input, output, session) {
                                       "Mean Temp:", round(mean_temp, 2), "°C"),
                        color = circle_colors, fillOpacity = 0.7)
     
-    # Fit map bounds to the filtered data
-    if (nrow(data) > 0) {
-      leafletProxy("station_map") %>%
-        fitBounds(
-          lng1 = min(data$LONGITUDE, na.rm = TRUE),
-          lat1 = min(data$LATITUDE, na.rm = TRUE),
-          lng2 = max(data$LONGITUDE, na.rm = TRUE),
-          lat2 = max(data$LATITUDE, na.rm = TRUE)
-        )
-    }
   })
   
 })
