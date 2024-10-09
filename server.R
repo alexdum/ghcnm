@@ -85,8 +85,8 @@ shinyServer(function(input, output, session) {
                        popup = ~paste("Station:", NAME, "<br>",
                                       "ID:", ID, "<br>",
                                       "Elevation:", STNELEV, "m<br>",
-                                      "First Year:", input$year_range[1], "<br>",
-                                      "Last Year:", input$year_range[2], "<br>",
+                                      "Available years:", first_year, "-", last_year, "<br>",
+                                      "Selected years:", input$year_range[1], "-", input$year_range[2], "<br>",
                                       "Mean Temp:", round(mean_temp, 2), "°C"),
                        color = ~qpal2(mean_temp), fillOpacity = 0.7,
                        options = pathOptions(pane = "markersPane")) %>%
