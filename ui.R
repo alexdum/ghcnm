@@ -32,5 +32,11 @@ ui <- page_navbar(
         leafletOutput("station_map", height = "90vh")
       )
     )
+  ),
+  nav_panel(
+    "Info",
+    card(
+      includeHTML("www/html/info_tavg.html")  # Load external HTML file
+    )
   )
 )
