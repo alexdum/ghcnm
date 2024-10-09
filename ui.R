@@ -4,7 +4,7 @@ ui <- page_navbar(
   
   # Add the canonical link inside the head tag
   tags$head(
-    tags$link(rel = "canonical", href = "https://climate-insights.netlify.app/ghcn")
+    tags$link(rel = "canonical", href = "https://climate-insights.netlify.app/ghcnm")
   ),
   
   fillable_mobile = T,
