@@ -9,7 +9,8 @@ RUN install2.r --error \
     highcharter \
     arrow \
     leaflet \
-    leaflet.extras 
+    leaflet.extras \
+    markdown
 
 # Install development packages from GitHub
 RUN installGithub.r \
