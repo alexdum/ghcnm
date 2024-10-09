@@ -40,11 +40,22 @@ shinyServer(function(input, output, session) {
       addTiles(group = "OpenStreetMap") %>%  # Default OpenStreetMap
       addProviderTiles(providers$Esri.WorldTopoMap, group = "Esri World Topo Map") %>%
       addProviderTiles(providers$Esri.WorldImagery, group = "Esri World Imagery") %>%
+      
+      # Create a custom pane for circle markers with a lower zIndex
+      addMapPane("markersPane", zIndex = 400) %>%
+      addMapPane("labelsPane", zIndex = 500) %>%  # Higher pane for labels
+      
+      addProviderTiles(providers$CartoDB.PositronOnlyLabels, 
+                       group = "CartoDB Labels", 
+                       options = providerTileOptions(opacity = 0.8, pane = "labelsPane")) %>%
+      
       setView(lng = initial_lng, lat = initial_lat, zoom = initial_zoom) %>%
       addLayersControl(
         baseGroups = c("Esri World Imagery", "Esri World Topo Map", "OpenStreetMap"),
-        options = layersControlOptions(collapsed = T) 
+        overlayGroups = c("CartoDB Labels"),  # Add CartoDB labels to the overlay control
+        options = layersControlOptions(collapsed = TRUE)
       ) %>%
+      
       # Add a home button
       addEasyButton(
         easyButton(
@@ -61,11 +72,13 @@ shinyServer(function(input, output, session) {
     
     # Define a bin-based color palette for temperature values
     bins <- 6  # Specify the number of bins
-    qpal <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = F)
-    qpal2 <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = T)
+    qpal <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = FALSE)
+    qpal2 <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = TRUE)
     
     leafletProxy("station_map", data = data) %>%
       clearMarkers() %>%
+      
+      # Add markers to the custom pane with lower zIndex
       addCircleMarkers(lng = data$LONGITUDE, lat = data$LATITUDE,
                        radius = 5, 
                        popup = ~paste("Station:", NAME, "<br>",
@@ -74,8 +87,11 @@ shinyServer(function(input, output, session) {
                                       "First Year:", input$year_range[1], "<br>",
                                       "Last Year:", input$year_range[2], "<br>",
                                       "Mean Temp:", round(mean_temp, 2), "°C"),
-                       color = ~qpal2(mean_temp), fillOpacity = 0.7) %>%
+                       color = ~qpal2(mean_temp), fillOpacity = 0.7,
+                       options = pathOptions(pane = "markersPane")) %>%
+      
       clearControls() %>%
+      
       addLegend(position = "bottomleft",  # Position the legend at the lower right
                 pal = qpal,                # Use the previously defined color palette
                 values = data$mean_temp,    # The values to map to the color scale
@@ -83,8 +99,9 @@ shinyServer(function(input, output, session) {
                 opacity = 0.7,             # Set opacity of the legend
                 na.label = "No data",
                 labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE))
-                )            # Reverse the order of intervals in the legend
+      )  # Reverse the order of intervals in the legend
   })
+  
   
 })
 
