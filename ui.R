@@ -2,9 +2,10 @@
 ui <- page_navbar(
   theme = bs_theme(version = 5),
   
-  # Add the canonical link inside the head tag
+  # Add the canonical link and noindex meta tag inside the head tag
   tags$head(
-    tags$link(rel = "canonical", href = "https://climate-insights.netlify.app/ghcnm")
+    tags$link(rel = "canonical", href = "https://climate-insights.netlify.app/ghcnm"),
+    tags$meta(name = "robots", content = "noindex,indexifembedded")
   ),
   
   fillable_mobile = T,
