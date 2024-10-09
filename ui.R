@@ -27,7 +27,7 @@ ui <- page_navbar(
       card(
         full_screen = TRUE,
         
-        h6("Multiannnual mean"),
+        h6(textOutput("map_title")),
         # Main panel content
         leafletOutput("station_map", height = "90vh")
       )
