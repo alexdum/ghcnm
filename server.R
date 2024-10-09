@@ -90,7 +90,7 @@ shinyServer(function(input, output, session) {
                                       "Available years:", first_year, "-", last_year, "<br>",
                                       "Selected years:", input$year_range[1], "-", input$year_range[2], "<br>",
                                       "Mean Temp:", round(mean_temp, 2), "°C"),
-                       color = ~qpal2(mean_temp), fillOpacity = 0.7,
+                       color = ~qpal2(mean_temp), fillOpacity = 1,
                        options = pathOptions(pane = "markersPane")) %>%
       
       clearControls() %>%
@@ -99,7 +99,7 @@ shinyServer(function(input, output, session) {
                 pal = qpal,                # Use the previously defined color palette
                 values = data$mean_temp,    # The values to map to the color scale
                 title = htmltools::HTML("<div style='text-align: center;'>°C</div>"),  # Align title to the left using HTML
-                opacity = 0.9,             # Set opacity of the legend
+                opacity = 1,             # Set opacity of the legend
                 na.label = "No data",
                 labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE))
       )  # Reverse the order of intervals in the legend
