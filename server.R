@@ -38,6 +38,7 @@ shinyServer(function(input, output, session) {
   output$station_map <- renderLeaflet({
     leaflet() %>%
       addTiles(group = "OpenStreetMap") %>%  # Default OpenStreetMap
+      addProviderTiles(providers$CartoDB.PositronNoLabels, group = "CartoDB Positron") %>%
       addProviderTiles(providers$Esri.WorldTopoMap, group = "Esri World Topo Map") %>%
       addProviderTiles(providers$Esri.WorldImagery, group = "Esri World Imagery") %>%
       
@@ -51,7 +52,7 @@ shinyServer(function(input, output, session) {
       
       setView(lng = initial_lng, lat = initial_lat, zoom = initial_zoom) %>%
       addLayersControl(
-        baseGroups = c("Esri World Imagery", "Esri World Topo Map", "OpenStreetMap"),
+        baseGroups = c("CartoDB Voyager", "Esri World Imagery", "Esri World Topo Map", "OpenStreetMap"),
         overlayGroups = c("CartoDB Labels"),  # Add CartoDB labels to the overlay control
         options = layersControlOptions(collapsed = TRUE)
       ) %>%
@@ -96,7 +97,7 @@ shinyServer(function(input, output, session) {
                 pal = qpal,                # Use the previously defined color palette
                 values = data$mean_temp,    # The values to map to the color scale
                 title = htmltools::HTML("<div style='text-align: center;'>°C</div>"),  # Align title to the left using HTML
-                opacity = 0.7,             # Set opacity of the legend
+                opacity = 0.9,             # Set opacity of the legend
                 na.label = "No data",
                 labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE))
       )  # Reverse the order of intervals in the legend
