@@ -42,7 +42,7 @@ shinyServer(function(input, output, session) {
       addProviderTiles(providers$Esri.WorldImagery, group = "Esri World Imagery") %>%
       setView(lng = initial_lng, lat = initial_lat, zoom = initial_zoom) %>%
       addLayersControl(
-        baseGroups = c("Esri World Topo Map", "OpenStreetMap", "Esri World Imagery"),
+        baseGroups = c("Esri World Imagery", "Esri World Topo Map", "OpenStreetMap"),
         options = layersControlOptions(collapsed = T) 
       ) %>%
       # Add a home button
