@@ -1,8 +1,12 @@
 # Define the UI using bslib's page_sidebar layout
 ui <- page_navbar(
   theme = bs_theme(version = 5),
-  # Include the external CSS file
-  #includeCSS("www/styles.css"),  # Assuming sales.css is in the www folder
+  
+  # Add the canonical link inside the head tag
+  tags$head(
+    tags$link(rel = "canonical", href = "https://climate-insights.netlify.app/ghcn")
+  ),
+  
   fillable_mobile = T,
   collapsible = T,
   nav_panel(
