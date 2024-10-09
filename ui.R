@@ -35,7 +35,7 @@ ui <- page_navbar(
   nav_panel(
     "Info",
     card(
-      includeHTML("www/html/info_tavg.html")  # Load external HTML file
+      includeMarkdown("www/md/info_tavg.md")  # Load external HTML file
     )
   )
 )
