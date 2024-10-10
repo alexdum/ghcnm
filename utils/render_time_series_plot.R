@@ -29,7 +29,7 @@ render_time_series_plot <- function(data, station_id, month) {
         l = 20,  # Left margin
         r = 5,  # Right margin
         t = 20,  # Top margin (leave a bit of space for the title)
-        b = 0   # Bottom margin
+        b = 2   # Bottom margin
       ),
       shapes = list(
         list(
