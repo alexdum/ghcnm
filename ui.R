@@ -56,9 +56,10 @@ ui <- page_navbar(
     ),
     
     absolutePanel(
+      draggable = TRUE,
       top = 185, left = 440, right = "auto", bottom = "auto",
       width = 450, height = "auto",
-      uiOutput("time_series_ui"),
+      plotlyOutput("time_series_plot", height = "250px"),
       style = "transform: translate(-50%, -50%);"  # Center the panel
     )
     

@@ -179,11 +179,7 @@ shinyServer(function(input, output, session) {
       add_trace(x = ~YEAR, y = fitted(lm(VALUE ~ YEAR, data = data)), mode = 'lines', name = 'Linear Trend')
   })
   
-  # UI element to display the time series plot
-  output$time_series_ui <- renderUI({
-    plotlyOutput("time_series_plot", height = "250px")
-  })
-  
+
   # Observer to handle click events on the map markers and update plot accordingly
   observeEvent(input$station_map_marker_click, {
     # Trigger the time series plot update based on the clicked station
