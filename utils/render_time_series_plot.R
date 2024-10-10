@@ -4,7 +4,7 @@ render_time_series_plot <- function(data, station_id, month) {
       title = list(
         text = paste(station_id, tavg_meta$NAME[tavg_meta$ID == station_id]),
         x = 0,  # Align title to the left
-        y = 1,
+        y = 0.95,
         xanchor = 'left',  # Anchor title to the left
         font = list(size = 12)
       ),
