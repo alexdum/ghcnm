@@ -155,12 +155,14 @@ shinyServer(function(input, output, session) {
         xaxis = list(
           zeroline = FALSE, 
           gridcolor = 'lightgray',
-          title = ""  # Remove x-axis title here
+          title = "",  # Remove x-axis title here,
+          fixedrange = TRUE  # Disable zoom on the y-axis
         ),
         yaxis = list(
           title = list(text = paste(month, '(°C)'), font = list(size = 10)), 
           zeroline = FALSE, 
-          gridcolor = 'lightgray'
+          gridcolor = 'lightgray',
+          fixedrange = TRUE  # Disable zoom on the y-axis
         ),
         showlegend = FALSE,
         plot_bgcolor = 'rgba(255, 255, 255, 0)',  # Semi-transparent background
@@ -173,10 +175,18 @@ shinyServer(function(input, output, session) {
             xref = 'paper', yref = 'paper',
             fillcolor = 'rgba(255, 255, 255, 0)',  # Invisible border (roundness effect)
             line = list(width = 0)
-          )
+          ),
+          dragmode = FALSE,  # Disable dragging (pan)
+          # Other layout options...
         )
       ) %>%
-      add_trace(x = ~YEAR, y = fitted(lm(VALUE ~ YEAR, data = data)), mode = 'lines', name = 'Linear Trend')
+      add_trace(x = ~YEAR, y = fitted(lm(VALUE ~ YEAR, data = data)), mode = 'lines', name = 'Linear Trend') |>
+      config(
+        modeBarButtonsToRemove = list(
+          'zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d'
+        ),
+        displaylogo = FALSE  # Optionally, remove the Plotly logo
+      )
   })
   
 
@@ -202,12 +212,14 @@ shinyServer(function(input, output, session) {
           xaxis = list(
             zeroline = FALSE, 
             gridcolor = 'lightgray',
-            title = ""  # Remove x-axis title here
+            title = "",
+            fixedrange = TRUE  # Remove x-axis title here
           ),
           yaxis = list(
             title = list(text = paste(month, '(°C)'), font = list(size = 10)), 
             zeroline = FALSE, 
-            gridcolor = 'lightgray'
+            gridcolor = 'lightgray',
+            fixedrange = TRUE
           ),
           showlegend = FALSE,
           plot_bgcolor = 'rgba(255, 255, 255, 0)',  # Semi-transparent background
@@ -223,7 +235,13 @@ shinyServer(function(input, output, session) {
             )
           )
         ) %>%
-        add_trace(x = ~YEAR, y = fitted(lm(VALUE ~ YEAR, data = data)), mode = 'lines', name = 'Linear Trend')
+        add_trace(x = ~YEAR, y = fitted(lm(VALUE ~ YEAR, data = data)), mode = 'lines', name = 'Linear Trend') |>
+        config(
+          modeBarButtonsToRemove = list(
+            'zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d'
+          ),
+          displaylogo = FALSE  # Optionally, remove the Plotly logo
+        )
     })
   })
   
@@ -249,12 +267,14 @@ shinyServer(function(input, output, session) {
           xaxis = list(
             zeroline = FALSE, 
             gridcolor = 'lightgray',
-            title = ""  # Remove x-axis title here
+            title = "",
+            fixedrange = TRUE  # Remove x-axis title here
           ),
           yaxis = list(
             title = list(text = paste(month, '(°C)'), font = list(size = 10)), 
             zeroline = FALSE, 
-            gridcolor = 'lightgray'
+            gridcolor = 'lightgray',
+            fixedrange = TRUE
           ),
           showlegend = FALSE,
           plot_bgcolor = 'rgba(255, 255, 255, 0)',  # Semi-transparent background
@@ -270,7 +290,13 @@ shinyServer(function(input, output, session) {
             )
           )
         ) %>%
-        add_trace(x = ~YEAR, y = fitted(lm(VALUE ~ YEAR, data = data)), mode = 'lines', name = 'Linear Trend')
+        add_trace(x = ~YEAR, y = fitted(lm(VALUE ~ YEAR, data = data)), mode = 'lines', name = 'Linear Trend') |>
+        config(
+          modeBarButtonsToRemove = list(
+            'zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d'
+          ),
+          displaylogo = FALSE  # Optionally, remove the Plotly logo
+        )
     })
   })
   
