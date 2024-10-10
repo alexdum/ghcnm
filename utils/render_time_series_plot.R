@@ -4,7 +4,7 @@ render_time_series_plot <- function(data, station_id, month) {
     layout(
       title = list(
         text = paste(station_id, tavg_meta$NAME[tavg_meta$ID == station_id]),
-        y = 0.98,
+        y = 1,
         font = list(size = 12)
       ),
       xaxis = list(

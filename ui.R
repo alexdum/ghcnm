@@ -5,7 +5,13 @@ ui <- page_navbar(
   # Add the canonical link and noindex meta tag inside the head tag
   tags$head(
     tags$link(rel = "canonical", href = "https://climate-insights.netlify.app/ghcnm"),
-    tags$meta(name = "robots", content = "noindex,indexifembedded")
+    tags$meta(name = "robots", content = "noindex,indexifembedded"),
+    tags$link(rel = "stylesheet", type = "text/css", href = "custom.css"),  # Link to custom CSS
+    tags$script(HTML("
+    $(document).ready(function(){
+      $('[data-toggle=\"tooltip\"]').tooltip(); 
+    });
+  "))
   ),
   
   fillable_mobile = T,
@@ -52,16 +58,13 @@ ui <- page_navbar(
       
       # Select input for choosing a month
       selectInput("month", "Select Month:",
-                  choices = month.name, selected = month.name[1])
+                  choices = month.name, selected = month.name[1]),
+      
     ),
     
-    absolutePanel(
-      draggable = TRUE,
-      top = 185, left = 440, right = "auto", bottom = "auto",
-      width = 450, height = "auto",
-      plotlyOutput("time_series_plot", height = "200px"),
-      style = "transform: translate(-50%, -50%);"  # Center the panel
-    )
+    # Conditionally render the panel with the plot when the plotly output is available
+    # Use uiOutput to conditionally render the plot panel
+    uiOutput("plot_panel")
     
     
   ),

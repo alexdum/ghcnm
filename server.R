@@ -137,6 +137,8 @@ shinyServer(function(input, output, session) {
     
   })
   
+
+  
   # Observer to handle rendering of the time series plot when inputs (month, year) or station selection change
   output$time_series_plot <- renderPlotly({
     data <- time_series_data()  # Get the filtered time series data
@@ -183,5 +185,61 @@ shinyServer(function(input, output, session) {
 
     })
   })
+  
+  
+  # Create a reactive flag indicating whether the plot is available
+  plot_available <- reactive({
+    req(input$station_map_marker_click$id)
+    nrow(time_series_data()) > 0
+  })
+  
+  # Expose the plot_available flag to the client
+  output$plot_available <- reactive({
+    plot_available()
+  })
+  outputOptions(output, "plot_available", suspendWhenHidden = FALSE)
+  
+  # Inside your server.R or server function
+  
+  output$plot_panel <- renderUI({
+    if (plot_available()) {
+      absolutePanel(
+        draggable = TRUE,
+        top = 190, left = 440, right = "auto", bottom = "auto",
+        width = 450, height = "auto",
+        # Add the Download Data button with Font Awesome icon
+        downloadButton(
+          outputId = "download_data",
+          label = NULL,  # No text label
+          icon = icon("download"),  # Font Awesome download icon
+          class = "custom-download-button",  # Custom CSS class for styling
+          title = "Download Data",  # Tooltip text
+          `data-toggle` = "tooltip"  # Enable tooltip
+        ),
+        plotlyOutput("time_series_plot", height = "200px"),
+        style = "transform: translate(-50%, -50%);"  # Center the panel
+      )
+    }
+  })
+  
+
+  
+  # Define the download handler for downloading the time series data
+  output$download_data <- downloadHandler(
+    filename = function() {
+      # Create a dynamic filename based on station ID and month
+      station_id <- input$station_map_marker_click$id
+      month <- input$month
+      paste("station_", station_id, "_", month, "_time_series.csv", sep = "")
+    },
+    content = function(file) {
+      # Get the time series data for the clicked station
+      data <- time_series_data()
+      
+      # Write the data to a CSV file
+      write.csv(data, file, row.names = FALSE)
+    }
+  )
+  
   
 })

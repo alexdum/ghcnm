@@ -1,0 +1,13 @@
+/* Style for the custom download button */
+.custom-download-button {
+  background: transparent; /* Make background transparent */
+  border: none;            /* Remove borders */
+  color: #007BFF;          /* Set icon color (Bootstrap primary blue) */
+  padding: 0;              /* Remove padding */
+  cursor: pointer;         /* Change cursor to pointer on hover */
+}
+
+.custom-download-button:hover {
+  color: #0056b3;          /* Darker blue on hover */
+  text-decoration: none;   /* Remove underline on hover */
+}
