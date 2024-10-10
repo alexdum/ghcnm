@@ -36,7 +36,7 @@ ui <- page_navbar(
     #       leafletOutput("station_map", height = "90vh")
     #     )
     #   )
-    leafletOutput("station_map", height = "90vh"),
+    leafletOutput("station_map", width = "100%", height = "100%"),
     absolutePanel(
       top = 200, left = 30, right = "auto", bottom = "auto",
       width = 150, height = "auto",
