@@ -1,10 +1,11 @@
-# Helper function to render the time series plot with minimal margins
 render_time_series_plot <- function(data, station_id, month) {
   plot_ly(data, x = ~YEAR, y = ~VALUE, type = 'scatter', mode = 'lines+markers', name = 'TAVG') %>%
     layout(
       title = list(
         text = paste(station_id, tavg_meta$NAME[tavg_meta$ID == station_id]),
+        x = 0,  # Align title to the left
         y = 1,
+        xanchor = 'left',  # Anchor title to the left
         font = list(size = 12)
       ),
       xaxis = list(
