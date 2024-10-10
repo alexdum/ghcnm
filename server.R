@@ -205,9 +205,10 @@ shinyServer(function(input, output, session) {
     if (plot_available()) {
       absolutePanel(
         draggable = TRUE,
-        top = 190, left = 440, right = "auto", bottom = "auto",
+        top = 280, left = 30, right = "auto", bottom = "auto",
         width = 450, height = "auto",
         # Add the Download Data button with Font Awesome icon
+        plotlyOutput("time_series_plot", height = "200px"),
         downloadButton(
           outputId = "download_data",
           label = NULL,  # No text label
@@ -215,9 +216,7 @@ shinyServer(function(input, output, session) {
           class = "custom-download-button",  # Custom CSS class for styling
           title = "Download Data",  # Tooltip text
           `data-toggle` = "tooltip"  # Enable tooltip
-        ),
-        plotlyOutput("time_series_plot", height = "200px"),
-        style = "transform: translate(-50%, -50%);"  # Center the panel
+        )
       )
     }
   })
