@@ -32,8 +32,8 @@ shinyServer(function(input, output, session) {
   output$map_title <- renderText({ paste("Multiannual mean:", input$year_range[1], "to", input$year_range[2]) })
   
   # Set the initial view for the map
-  initial_lng <- 0
-  initial_lat <- 0
+  initial_lng <- mean(stations_data$LONGITUDE, na.rm = TRUE)
+  initial_lat <- mean(stations_data$LATITUDE, na.rm = TRUE)
   initial_zoom <- 2
   
   # Render the Leaflet map
