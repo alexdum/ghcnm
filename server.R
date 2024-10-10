@@ -229,7 +229,7 @@ shinyServer(function(input, output, session) {
       # Create a dynamic filename based on station ID and month
       station_id <- input$station_map_marker_click$id
       month <- input$month
-      paste("station_", station_id, "_", month, "_time_series.csv", sep = "")
+      paste0(tavg_meta$NAME[tavg_meta$ID == station_id],"_", station_id, "_", month)
     },
     content = function(file) {
       # Get the time series data for the clicked station
