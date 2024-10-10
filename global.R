@@ -12,7 +12,7 @@ tavg_meta <- read.csv("www/data/tabs/tavg_meta.csv")
 tavg_avail <- read.csv("www/data/tabs/tavg_vaialability.csv")
 
 # Merge the metadata and availability data on 'ID'
-stations_data <- merge(tavg_meta, tavg_avail, by = "ID")
+meta <- merge(tavg_meta, tavg_avail, by = "ID")
 
 # Open the Parquet dataset using arrow
 tavg_dataset <- open_dataset("www/data/tabs/tavg_long.parquet")

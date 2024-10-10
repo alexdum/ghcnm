@@ -22,7 +22,7 @@ shinyServer(function(input, output, session) {
   filtered_stations <- reactive({
     filtered_data <- filtered_parquet_data()
     # Join filtered mean temperature data with station data
-    stations_data %>%
+    meta %>%
       filter(first_year <= input$year_range[1],
              last_year >= input$year_range[2],
              ID %in% filtered_data$ID) %>%
@@ -32,8 +32,8 @@ shinyServer(function(input, output, session) {
   output$map_title <- renderText({ paste("Multiannual mean:", input$year_range[1], "to", input$year_range[2]) })
   
   # Set the initial view for the map
-  initial_lng <- 5 #mean(stations_data$LONGITUDE, na.rm = TRUE)
-  initial_lat <- mean(stations_data$LATITUDE, na.rm = TRUE)
+  initial_lng <- 5 #mean(meta$LONGITUDE, na.rm = TRUE)
+  initial_lat <- mean(meta$LATITUDE, na.rm = TRUE)
   initial_zoom <- 2
   
   # Render the Leaflet map
