@@ -32,7 +32,7 @@ shinyServer(function(input, output, session) {
   output$map_title <- renderText({ paste("Multiannual mean:", input$year_range[1], "to", input$year_range[2]) })
   
   # Set the initial view for the map
-  initial_lng <- 0 #mean(stations_data$LONGITUDE, na.rm = TRUE)
+  initial_lng <- 5 #mean(stations_data$LONGITUDE, na.rm = TRUE)
   initial_lat <- mean(stations_data$LATITUDE, na.rm = TRUE)
   initial_zoom <- 2
   
@@ -95,7 +95,7 @@ shinyServer(function(input, output, session) {
       
       clearControls() %>%
       
-      addLegend(position = "bottomright",  # Position the legend at the lower right
+      addLegend(position = "bottomleft",  # Position the legend at the lower right
                 pal = qpal,                # Use the previously defined color palette
                 values = data$mean_temp,    # The values to map to the color scale
                 title = htmltools::HTML("<div style='text-align: center;'>°C</div>"),  # Align title to the left using HTML
