@@ -36,25 +36,27 @@ ui <- page_navbar(
     #       leafletOutput("station_map", height = "90vh")
     #     )
     #   )
-    leafletOutput("station_map", width = "100%", height = "100%"),
-    absolutePanel(
-      top = 200, left = 30, right = "auto", bottom = "auto",
-      width = 150, height = "auto",
-      #Slider for selecting a range of years (first_year and last_year)
-      sliderInput("year_range", "Select Year Range:",
-                  min = min(stations_data$first_year, na.rm = TRUE),
-                  max = max(stations_data$last_year, na.rm = TRUE),
-                  value = c(1961,
-                            max(stations_data$last_year, na.rm = TRUE)),
-                  step = 1,
-                  sep = ""),
+    
+    card(
+      leafletOutput("station_map", width = "100%", height = "100%"),
+      absolutePanel(
+        top = 200, left = 30, right = "auto", bottom = "auto",
+        width = 150, height = "auto",
+        #Slider for selecting a range of years (first_year and last_year)
+        sliderInput("year_range", "Select Year Range:",
+                    min = min(stations_data$first_year, na.rm = TRUE),
+                    max = max(stations_data$last_year, na.rm = TRUE),
+                    value = c(1961,
+                              max(stations_data$last_year, na.rm = TRUE)),
+                    step = 1,
+                    sep = ""),
+        
+        # Select input for choosing a month
+        selectInput("month", "Select Month:",
+                    choices = month.name, selected = month.name[1])
+      )
       
-      # Select input for choosing a month
-      selectInput("month", "Select Month:",
-                  choices = month.name, selected = month.name[1])
     )
-    
-    
   ),
   nav_panel(
     "Info",
