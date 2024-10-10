@@ -53,6 +53,13 @@ ui <- page_navbar(
       # Select input for choosing a month
       selectInput("month", "Select Month:",
                   choices = month.name, selected = month.name[1])
+    ),
+    
+    absolutePanel(
+      top = 185, left = 440, right = "auto", bottom = "auto",
+      width = 450, height = "auto",
+      uiOutput("time_series_ui"),
+      style = "transform: translate(-50%, -50%);"  # Center the panel
     )
     
     

@@ -10,7 +10,8 @@ RUN install2.r --error \
     arrow \
     leaflet \
     leaflet.extras \
-    markdown
+    markdown \
+    plotly
 
 # Install development packages from GitHub
 RUN installGithub.r \

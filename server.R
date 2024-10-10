@@ -1,4 +1,3 @@
-
 # Define the server logic
 shinyServer(function(input, output, session) {
   
@@ -22,7 +21,7 @@ shinyServer(function(input, output, session) {
   filtered_stations <- reactive({
     filtered_data <- filtered_parquet_data()
     # Join filtered mean temperature data with station data
-    meta %>%
+    stations_data %>%
       filter(first_year <= input$year_range[1],
              last_year >= input$year_range[2],
              ID %in% filtered_data$ID) %>%
@@ -32,8 +31,8 @@ shinyServer(function(input, output, session) {
   output$map_title <- renderText({ paste("Multiannual mean:", input$year_range[1], "to", input$year_range[2]) })
   
   # Set the initial view for the map
-  initial_lng <- 5 #mean(meta$LONGITUDE, na.rm = TRUE)
-  initial_lat <- mean(meta$LATITUDE, na.rm = TRUE)
+  initial_lng <- 5 #mean(stations_data$LONGITUDE, na.rm = TRUE)
+  initial_lat <- mean(stations_data$LATITUDE, na.rm = TRUE)
   initial_zoom <- 2
   
   # Render the Leaflet map
@@ -76,11 +75,8 @@ shinyServer(function(input, output, session) {
                                initial_lat, initial_lng, initial_zoom)),
           position = "topright" # Move the button to the top-right corner
         )
-       
-        
       )
   })
-  
   
   observe({
     data <- filtered_stations()
@@ -96,6 +92,7 @@ shinyServer(function(input, output, session) {
       # Add markers to the custom pane with lower zIndex
       addCircleMarkers(lng = data$LONGITUDE, lat = data$LATITUDE,
                        radius = 5, 
+                       layerId = ~ID,
                        popup = ~paste("Station:", NAME, "<br>",
                                       "ID:", ID, "<br>",
                                       "Elevation:", STNELEV, "m<br>",
@@ -117,6 +114,168 @@ shinyServer(function(input, output, session) {
       )  # Reverse the order of intervals in the legend
   })
   
+  # Reactive expression to retrieve time series data for the selected station and year/month inputs
+  time_series_data <- reactive({
+    req(input$station_map_marker_click$id)  # Ensure a station is clicked
+    
+    station_id <- input$station_map_marker_click$id
+    month <- input$month
+    
+    # Filter the dataset based on selected station, month, and year range
+    time_series_data <-
+      tavg_dataset %>%
+      filter(
+        VALUE >= -90,
+        YEAR >= input$year_range[1],
+        YEAR <= input$year_range[2],
+        MONTH == match(input$month, month.name),
+        ID == station_id) %>%
+      collect() |>
+      mutate(YEAR = as.numeric(YEAR)) 
+    
+    time_series_data
+    
+  })
+  
+  # Observer to handle rendering of the time series plot when inputs (month, year) or station selection change
+  output$time_series_plot <- renderPlotly({
+    data <- time_series_data()  # Get the filtered time series data
+    req(nrow(data) > 0)  # Ensure there is data to plot
+    
+    station_id <- input$station_map_marker_click$id
+    month <- input$month
+    
+    plot_ly(data, x = ~YEAR, y = ~VALUE, type = 'scatter', mode = 'lines+markers', name = 'TAVG') %>%
+      layout(
+        title = list(
+          text = paste(station_id, tavg_meta$NAME[tavg_meta$ID == station_id]),
+          y = 0.80,
+          font = list(size = 12)  # Decrease title size here
+        ),
+        xaxis = list(
+          zeroline = FALSE, 
+          gridcolor = 'lightgray',
+          title = ""  # Remove x-axis title here
+        ),
+        yaxis = list(
+          title = list(text = paste(month, '(°C)'), font = list(size = 10)), 
+          zeroline = FALSE, 
+          gridcolor = 'lightgray'
+        ),
+        showlegend = FALSE,
+        plot_bgcolor = 'rgba(255, 255, 255, 0)',  # Semi-transparent background
+        paper_bgcolor = 'rgba(255, 255, 255, 0)', # Semi-transparent background
+        margin = list(t = 60, b = 60, l = 60, r = 60), # Space for rounded corners
+        shapes = list(
+          list(
+            type = 'rect',
+            x0 = 0, x1 = 1, y0 = 0, y1 = 1,
+            xref = 'paper', yref = 'paper',
+            fillcolor = 'rgba(255, 255, 255, 0)',  # Invisible border (roundness effect)
+            line = list(width = 0)
+          )
+        )
+      ) %>%
+      add_trace(x = ~YEAR, y = fitted(lm(VALUE ~ YEAR, data = data)), mode = 'lines', name = 'Linear Trend')
+  })
+  
+  # UI element to display the time series plot
+  output$time_series_ui <- renderUI({
+    plotlyOutput("time_series_plot", height = "250px")
+  })
+  
+  # Observer to handle click events on the map markers and update plot accordingly
+  observeEvent(input$station_map_marker_click, {
+    # Trigger the time series plot update based on the clicked station
+    station_id <- input$station_map_marker_click$id
+    
+    # Update the time series plot when a station is clicked
+    output$time_series_plot <- renderPlotly({
+      data <- time_series_data()  # Get the filtered time series data
+      req(nrow(data) > 0)  # Ensure there is data to plot
+      
+      month <- input$month
+      
+      plot_ly(data, x = ~YEAR, y = ~VALUE, type = 'scatter', mode = 'lines+markers', name = 'TAVG') %>%
+        layout(
+          title = list(
+            text = paste(station_id, tavg_meta$NAME[tavg_meta$ID == station_id]),
+            y = 0.80,
+            font = list(size = 12)  # Decrease title size here
+          ),
+          xaxis = list(
+            zeroline = FALSE, 
+            gridcolor = 'lightgray',
+            title = ""  # Remove x-axis title here
+          ),
+          yaxis = list(
+            title = list(text = paste(month, '(°C)'), font = list(size = 10)), 
+            zeroline = FALSE, 
+            gridcolor = 'lightgray'
+          ),
+          showlegend = FALSE,
+          plot_bgcolor = 'rgba(255, 255, 255, 0)',  # Semi-transparent background
+          paper_bgcolor = 'rgba(255, 255, 255, 0)', # Semi-transparent background
+          margin = list(t = 60, b = 60, l = 60, r = 60), # Space for rounded corners
+          shapes = list(
+            list(
+              type = 'rect',
+              x0 = 0, x1 = 1, y0 = 0, y1 = 1,
+              xref = 'paper', yref = 'paper',
+              fillcolor = 'rgba(255, 255, 255, 0)',  # Invisible border (roundness effect)
+              line = list(width = 0)
+            )
+          )
+        ) %>%
+        add_trace(x = ~YEAR, y = fitted(lm(VALUE ~ YEAR, data = data)), mode = 'lines', name = 'Linear Trend')
+    })
+  })
+  
+  # Reactive observer to update the plot when month or year inputs change
+  observe({
+    req(input$month, input$year_range)  # Ensure month and year range inputs are provided
+    
+    station_id <- input$station_map_marker_click$id
+    month <- input$month
+    
+    # Update the time series plot when month or year inputs change
+    output$time_series_plot <- renderPlotly({
+      data <- time_series_data()  # Get the filtered time series data
+      req(nrow(data) > 0)  # Ensure there is data to plot
+      
+      plot_ly(data, x = ~YEAR, y = ~VALUE, type = 'scatter', mode = 'lines+markers', name = 'TAVG') %>%
+        layout(
+          title = list(
+            text = paste(station_id, tavg_meta$NAME[tavg_meta$ID == station_id]),
+            y = 0.80,
+            font = list(size = 12)  # Decrease title size here
+          ),
+          xaxis = list(
+            zeroline = FALSE, 
+            gridcolor = 'lightgray',
+            title = ""  # Remove x-axis title here
+          ),
+          yaxis = list(
+            title = list(text = paste(month, '(°C)'), font = list(size = 10)), 
+            zeroline = FALSE, 
+            gridcolor = 'lightgray'
+          ),
+          showlegend = FALSE,
+          plot_bgcolor = 'rgba(255, 255, 255, 0)',  # Semi-transparent background
+          paper_bgcolor = 'rgba(255, 255, 255, 0)', # Semi-transparent background
+          margin = list(t = 60, b = 60, l = 60, r = 60), # Space for rounded corners
+          shapes = list(
+            list(
+              type = 'rect',
+              x0 = 0, x1 = 1, y0 = 0, y1 = 1,
+              xref = 'paper', yref = 'paper',
+              fillcolor = 'rgba(255, 255, 255, 0)',  # Invisible border (roundness effect)
+              line = list(width = 0)
+            )
+          )
+        ) %>%
+        add_trace(x = ~YEAR, y = fitted(lm(VALUE ~ YEAR, data = data)), mode = 'lines', name = 'Linear Trend')
+    })
+  })
   
 })
-
