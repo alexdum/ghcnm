@@ -1,17 +1,17 @@
-# Helper function to render the time series plot
+# Helper function to render the time series plot with minimal margins
 render_time_series_plot <- function(data, station_id, month) {
   plot_ly(data, x = ~YEAR, y = ~VALUE, type = 'scatter', mode = 'lines+markers', name = 'TAVG') %>%
     layout(
       title = list(
         text = paste(station_id, tavg_meta$NAME[tavg_meta$ID == station_id]),
-        y = 0.80,
-        font = list(size = 12)  # Decrease title size here
+        y = 0.98,
+        font = list(size = 12)
       ),
       xaxis = list(
         zeroline = FALSE, 
         gridcolor = 'lightgray',
-        title = "",  # Remove x-axis title here
-        fixedrange = TRUE  # Disable zoom on the y-axis
+        title = "",  # Remove x-axis title
+        fixedrange = TRUE  # Disable zoom on the x-axis
       ),
       yaxis = list(
         title = list(text = paste(month, '(°C)'), font = list(size = 10)), 
@@ -22,7 +22,14 @@ render_time_series_plot <- function(data, station_id, month) {
       showlegend = FALSE,
       plot_bgcolor = 'rgba(255, 255, 255, 0)',  # Semi-transparent background
       paper_bgcolor = 'rgba(255, 255, 255, 0)', # Semi-transparent background
-      margin = list(t = 60, b = 60, l = 60, r = 60), # Space for rounded corners
+      
+      # Shrinking the margins as much as possible
+      margin = list(
+        l = 20,  # Left margin
+        r = 5,  # Right margin
+        t = 30,  # Top margin (leave a bit of space for the title)
+        b = 5   # Bottom margin
+      ),
       shapes = list(
         list(
           type = 'rect',
