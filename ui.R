@@ -40,7 +40,7 @@ ui <- page_navbar(
     
     leafletOutput("station_map", width = "100%", height = "100%"),
     absolutePanel(
-      top = 220, left = 30, right = "auto", bottom = "auto",
+      top = 80, left = 30, right = "auto", bottom = "auto",
       width = 150, height = "auto",
       #Slider for selecting a range of years (first_year and last_year)
       sliderInput("year_range", "Select Year Range:",

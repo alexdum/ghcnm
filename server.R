@@ -53,6 +53,14 @@ shinyServer(function(input, output, session) {
                        options = providerTileOptions(opacity = 0.8, pane = "labelsPane")) %>%
       
       setView(lng = initial_lng, lat = initial_lat, zoom = initial_zoom) %>%
+      
+      # Move zoom controls to the lower-left corner
+      addControl("<div></div>", position = "topright") %>%  # Placeholder to ensure the zoom controls are moved
+      htmlwidgets::onRender("function(el, x) {
+      var map = this;
+      map.zoomControl.setPosition('topright');
+    }") %>% 
+      
       addLayersControl(
         baseGroups = c("CartoDB Voyager", "Esri World Imagery", "Esri World Topo Map", "OpenStreetMap"),
         overlayGroups = c("CartoDB Labels"),  # Add CartoDB labels to the overlay control
@@ -65,10 +73,14 @@ shinyServer(function(input, output, session) {
           icon = "fa-home", 
           title = "Reset View",
           onClick = JS(sprintf("function(btn, map){ map.setView([%f, %f], %d); }", 
-                               initial_lat, initial_lng, initial_zoom))
+                               initial_lat, initial_lng, initial_zoom)),
+          position = "topright" # Move the button to the top-right corner
         )
+       
+        
       )
   })
+  
   
   observe({
     data <- filtered_stations()
