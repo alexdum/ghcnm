@@ -204,7 +204,7 @@ shinyServer(function(input, output, session) {
   output$plot_panel <- renderUI({
     if (plot_available()) {
       absolutePanel(
-        draggable = TRUE,
+        draggable = F,
         bottom = 30,  # Position from the bottom
         left = "50%",  # Start from the middle of the screen
         right = "auto",
@@ -223,7 +223,7 @@ shinyServer(function(input, output, session) {
           class = "custom-download-button",  # Custom CSS class for styling
           title = "Download Data",  # Tooltip text
           `data-toggle` = "tooltip",  # Enable tooltip
-          style = "float: left; margin-top: -25px;"  # Aligns the button to the left and positions it below the plot
+          style = "float: left; margin-top: -10px;"  # Aligns the button to the left and positions it below the plot
         )
       )
     }
