@@ -204,7 +204,7 @@ shinyServer(function(input, output, session) {
   output$plot_panel <- renderUI({
     if (plot_available()) {
       absolutePanel(
-        draggable = F,
+        draggable = T,
         bottom = 30,  # Position from the bottom
         left = "50%",  # Start from the middle of the screen
         right = "auto",
@@ -232,7 +232,7 @@ shinyServer(function(input, output, session) {
       # Create a dynamic filename based on station ID and month
       station_id <- input$station_map_marker_click$id
       month <- input$month
-      paste0(tavg_meta$NAME[tavg_meta$ID == station_id],"_", station_id, "_", month)
+      paste0(tavg_meta$NAME[tavg_meta$ID == station_id],"_", station_id, "_", month,".csv")
     },
     content = function(file) {
       # Get the time series data for the clicked station
