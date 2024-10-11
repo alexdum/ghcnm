@@ -204,13 +204,13 @@ shinyServer(function(input, output, session) {
   output$plot_panel <- renderUI({
     if (plot_available()) {
       absolutePanel(
-        draggable = TRUE,
+        draggable = F,
         bottom = 30,  # Position from the bottom
         left = "50%",  # Start from the middle of the screen
         right = "auto",
         width = 450,
         height = "auto",
-        style = "transform: translateX(-50%);",  # Center the panel horizontally
+        style = "transform: translateX(-50%); background-color: rgba(255, 255, 255, 0.8); border-radius: 10px; padding: 10px;",  # Transparent background with some styling
         # Add the Download Data button with Font Awesome icon
         plotlyOutput("time_series_plot", height = "200px"),
         downloadButton(
