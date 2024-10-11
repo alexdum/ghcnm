@@ -204,26 +204,32 @@ shinyServer(function(input, output, session) {
   output$plot_panel <- renderUI({
     if (plot_available()) {
       absolutePanel(
-        draggable = T,
+        draggable = TRUE,
         bottom = 30,  # Position from the bottom
         left = "50%",  # Start from the middle of the screen
         right = "auto",
         width = 450,
         height = "auto",
         style = "transform: translateX(-50%); background-color: rgba(255, 255, 255, 0.8); border-radius: 10px; padding: 10px;",  # Transparent background with some styling
-        # Add the Download Data button with Font Awesome icon
+        
+        # Time series plot
         plotlyOutput("time_series_plot", height = "200px"),
+        
+        # Download button positioned right below the plot, aligned to the left
         downloadButton(
           outputId = "download_data",
           label = NULL,  # No text label
           icon = icon("download"),  # Font Awesome download icon
           class = "custom-download-button",  # Custom CSS class for styling
           title = "Download Data",  # Tooltip text
-          `data-toggle` = "tooltip"  # Enable tooltip
+          `data-toggle` = "tooltip",  # Enable tooltip
+          style = "float: left; margin-top: -25px;"  # Aligns the button to the left and positions it below the plot
         )
       )
     }
   })
+  
+  
 
   
   # Define the download handler for downloading the time series data
