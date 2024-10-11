@@ -205,8 +205,12 @@ shinyServer(function(input, output, session) {
     if (plot_available()) {
       absolutePanel(
         draggable = TRUE,
-        top = 280, left = 30, right = "auto", bottom = "auto",
-        width = 450, height = "auto",
+        bottom = 30,  # Position from the bottom
+        left = "50%",  # Start from the middle of the screen
+        right = "auto",
+        width = 450,
+        height = "auto",
+        style = "transform: translateX(-50%);",  # Center the panel horizontally
         # Add the Download Data button with Font Awesome icon
         plotlyOutput("time_series_plot", height = "200px"),
         downloadButton(
@@ -220,7 +224,6 @@ shinyServer(function(input, output, session) {
       )
     }
   })
-  
 
   
   # Define the download handler for downloading the time series data
