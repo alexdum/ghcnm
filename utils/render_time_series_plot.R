@@ -1,4 +1,4 @@
-render_time_series_plot <- function(data, station_id, month, compare_data = NULL) {
+render_time_series_plot <- function(data, station_id, month) {
   # Check if station_id exists in tavg_meta
   if (!station_id %in% tavg_meta$ID) {
     stop("Station ID not found in metadata.")
@@ -14,7 +14,9 @@ render_time_series_plot <- function(data, station_id, month, compare_data = NULL
   )
   
   # Main plot
-  plot <- plot_ly(data, x = ~YEAR, y = ~VALUE, type = 'scatter', mode = 'lines+markers', name = 'TAVG') %>%
+  plot <- plot_ly(data, x = ~YEAR, y = ~VALUE, type = 'scatter', mode = 'lines',
+                  name = 'TAVG',   # Set neutral color for points
+                  line = list(color = 'red')) %>% # Set neutral color for the line
     layout(
       title = list(
         text = title_text,
@@ -72,35 +74,10 @@ render_time_series_plot <- function(data, station_id, month, compare_data = NULL
       y = fitted(linear_model),
       mode = 'lines',
       name = 'Linear Trend',
-      line = list(color = 'red'),
+      line = list(color = 'gray'),
       hoverinfo = 'x+y'  # Display only x and y without custom text
     )
   
-  # Add comparison data if provided
-  if (!is.null(compare_data)) {
-    # Fit a linear model for comparison data
-    compare_model <- lm(VALUE ~ YEAR, data = compare_data)
-    compare_slope <- coef(compare_model)["YEAR"]
-    
-    plot <- plot %>%
-      add_trace(
-        data = compare_data,
-        x = ~YEAR,
-        y = ~VALUE,
-        type = 'scatter',
-        mode = 'lines+markers',
-        name = 'Compare TAVG',
-        line = list(color = 'blue', dash = 'dash')
-      ) %>%
-      add_trace(
-        x = ~YEAR,
-        y = fitted(compare_model),
-        mode = 'lines',
-        name = 'Compare Trend',
-        line = list(color = 'blue', dash = 'dot'),
-        hoverinfo = 'x+y'  # Display only x and y without custom text
-      )
-  }
   
   # Configure the mode bar to show only the download button
   plot <- plot %>%
