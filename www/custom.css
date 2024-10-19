@@ -2,8 +2,6 @@
 .custom-download-button {
   background: transparent; /* Make background transparent */
   border: none;            /* Remove borders */
-  color: #007BFF;          /* Set icon color (Bootstrap primary blue) */
   padding: 0;              /* Remove padding */
   cursor: pointer;         /* Change cursor to pointer on hover */
 }
-
