@@ -137,7 +137,7 @@ shinyServer(function(input, output, session) {
     
   })
   
-
+  
   
   # Observer to handle rendering of the time series plot when inputs (month, year) or station selection change
   output$time_series_plot <- renderPlotly({
@@ -151,7 +151,7 @@ shinyServer(function(input, output, session) {
     
   })
   
-
+  
   # Observer to handle click events on the map markers and update plot accordingly
   observeEvent(input$station_map_marker_click, {
     # Trigger the time series plot update based on the clicked station
@@ -181,8 +181,8 @@ shinyServer(function(input, output, session) {
       data <- time_series_data()  # Get the filtered time series data
       req(nrow(data) > 0)  # Ensure there is data to plot
       
-     render_time_series_plot(data, station_id, month)
-
+      render_time_series_plot(data, station_id, month)
+      
     })
   })
   
@@ -221,16 +221,15 @@ shinyServer(function(input, output, session) {
           label = NULL,  # No text label
           icon = icon("download"),  # Font Awesome download icon
           class = "custom-download-button",  # Custom CSS class for styling
-          title = "Download Data",  # Tooltip text
-          `data-toggle` = "tooltip",  # Enable tooltip
           style = "float: left; margin-top: -10px;"  # Aligns the button to the left and positions it below the plot
-        )
+        ) |>
+          tooltip("Download data") # bslib data
       )
     }
   })
   
   
-
+  
   
   # Define the download handler for downloading the time series data
   output$download_data <- downloadHandler(
