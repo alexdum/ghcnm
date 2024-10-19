@@ -83,10 +83,13 @@ render_time_series_plot <- function(data, station_id, month) {
   plot <- plot %>%
     config(
       modeBarButtonsToRemove = list(
-        'zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d', 'toImage'
+        'zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d'
       ),
-      displaylogo = FALSE
-      #modeBarButtonsToAdd = list('toImage')
+      displaylogo = FALSE,
+      toImageButtonOptions = list(
+        format = 'png',  # Choose your desired format (png, jpeg, svg, webp)
+        filename = paste0(station_id, "_", month, "_time_series") 
+      )
     )
   
   return(plot)
