@@ -7,7 +7,3 @@
   cursor: pointer;         /* Change cursor to pointer on hover */
 }
 
-.custom-download-button:hover {
-  color: #0056b3;          /* Darker blue on hover */
-  text-decoration: none;   /* Remove underline on hover */
-}
