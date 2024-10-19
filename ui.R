@@ -7,11 +7,6 @@ ui <- page_navbar(
     tags$link(rel = "canonical", href = "https://climate-insights.netlify.app/ghcnm"),
     tags$meta(name = "robots", content = "noindex,indexifembedded"),
     tags$link(rel = "stylesheet", type = "text/css", href = "custom.css"),  # Link to custom CSS
-    tags$script(HTML("
-    $(document).ready(function(){
-      $('[data-toggle=\"tooltip\"]').tooltip(); 
-    });
-  "))
   ),
   
   fillable_mobile = T,
@@ -50,7 +45,7 @@ ui <- page_navbar(
       width = 150, height = "auto",
       #Slider for selecting a range of years (first_year and last_year)
       sliderInput("year_range", "Select Year Range:",
-                  min = min(stations_data$first_year, na.rm = TRUE),
+                  min = 1750,
                   max = max(stations_data$last_year, na.rm = TRUE),
                   value = c(1961, max(stations_data$last_year, na.rm = TRUE)),
                   step = 1,
