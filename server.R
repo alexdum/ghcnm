@@ -229,8 +229,6 @@ shinyServer(function(input, output, session) {
   })
   
   
-  
-  
   # Define the download handler for downloading the time series data
   output$download_data <- downloadHandler(
     filename = function() {
