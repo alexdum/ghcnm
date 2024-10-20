@@ -35,45 +35,50 @@ shinyServer(function(input, output, session) {
   initial_lat <- mean(stations_data$LATITUDE, na.rm = TRUE)
   initial_zoom <- 2
   
+  
+  
+  # Reactive values to store the selected and previous station IDs
+  selected_station_id <- reactiveVal(NULL)
+  previous_station_id <- reactiveVal(NULL)
+  
+  
+  # Function to generate labels
+  generateLabel <- function(name, id, elevation, first_year, last_year, mean_temp, selected_years) {
+    paste("Station:", name, "<br>",
+          "ID:", id, "<br>",
+          "Elevation:", elevation, "m<br>",
+          "Available years:", first_year, "-", last_year, "<br>",
+          "Selected years:", selected_years[1], "-", selected_years[2], "<br>",
+          "Mean Temp:", round(mean_temp, 1), "°C", 
+          "<br><span style='color:red;'>Click to get graph and data</span>") %>% 
+      lapply(htmltools::HTML)
+  }
+  
   # Render the Leaflet map
   output$station_map <- renderLeaflet({
     leaflet() %>%
-      addTiles(group = "OpenStreetMap") %>%  # Default OpenStreetMap
+      addTiles(group = "OpenStreetMap") %>%
       addProviderTiles(providers$CartoDB.PositronNoLabels, group = "CartoDB Positron") %>%
       addProviderTiles(providers$Esri.WorldTopoMap, group = "Esri World Topo Map") %>%
       addProviderTiles(providers$Esri.WorldImagery, group = "Esri World Imagery") %>%
-      
-      # Create a custom pane for circle markers with a lower zIndex
       addMapPane("markersPane", zIndex = 400) %>%
-      addMapPane("labelsPane", zIndex = 500) %>%  # Higher pane for labels
-      
-      addProviderTiles(providers$CartoDB.PositronOnlyLabels, 
-                       group = "CartoDB Labels", 
-                       options = providerTileOptions(opacity = 0.8, pane = "labelsPane")) %>%
-      
+      addMapPane("labelsPane", zIndex = 500) %>%
+      addProviderTiles(providers$CartoDB.PositronOnlyLabels, group = "CartoDB Labels", options = providerTileOptions(opacity = 0.8, pane = "labelsPane")) %>%
       setView(lng = initial_lng, lat = initial_lat, zoom = initial_zoom) %>%
-      
-      # Move zoom controls to the lower-left corner
-      addControl("<div></div>", position = "topright") %>%  # Placeholder to ensure the zoom controls are moved
-      htmlwidgets::onRender("function(el, x) {
-      var map = this;
-      map.zoomControl.setPosition('topright');
-    }") %>% 
-      
+      addControl("<div></div>", position = "topright") %>%
+      htmlwidgets::onRender("function(el, x) { var map = this; map.zoomControl.setPosition('topright'); }") %>%
       addLayersControl(
         baseGroups = c("CartoDB Voyager", "Esri World Imagery", "Esri World Topo Map", "OpenStreetMap"),
-        overlayGroups = c("CartoDB Labels"),  # Add CartoDB labels to the overlay control
+        overlayGroups = c("CartoDB Labels"),
         options = layersControlOptions(collapsed = TRUE)
       ) %>%
-      
-      # Add a home button
       addEasyButton(
         easyButton(
-          icon = "fa-home", 
+          icon = "fa-home",
           title = "Reset View",
           onClick = JS(sprintf("function(btn, map){ map.setView([%f, %f], %d); }", 
                                initial_lat, initial_lng, initial_zoom)),
-          position = "topright" # Move the button to the top-right corner
+          position = "topright"
         )
       )
   })
@@ -82,106 +87,82 @@ shinyServer(function(input, output, session) {
   observeEvent(filtered_stations(), {
     data <- filtered_stations()
     
-    # Define a bin-based color palette for temperature values
     bins <- 6
     qpal <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = FALSE)
     qpal2 <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = TRUE)
     
     leafletProxy("station_map", data = data) %>%
       clearMarkers() %>%
-      addCircleMarkers(lng = ~LONGITUDE, lat = ~LATITUDE,
-                       radius = 5,  # Default radius for all points
-                       layerId = ~ID,
-                       label = ~paste("Station:", NAME, "<br>",
-                                      "ID:", ID, "<br>",
-                                      "Elevation:", STNELEV, "m<br>",
-                                      "Available years:", first_year, "-", last_year, "<br>",
-                                      "Selected years:", input$year_range[1], "-", input$year_range[2], "<br>",
-                                      "Mean Temp:", round(mean_temp, 1), "°C", 
-                                      "<br><span style='color:red;'>Click to get graph and data</span>") %>% 
-                         lapply(htmltools::HTML),
-                       color = "grey", 
-                       weight = 1,  
-                       fillColor = ~qpal2(mean_temp),  # Color fill based on temperature
-                       fillOpacity = 1,
-                       options = pathOptions(pane = "markersPane")) %>%
+      addCircleMarkers(
+        lng = ~LONGITUDE, lat = ~LATITUDE,
+        radius = 5,
+        layerId = ~ID,
+        label = ~generateLabel(NAME, ID, STNELEV, first_year, last_year, mean_temp, input$year_range),
+        color = "grey",
+        weight = 1,
+        fillColor = ~qpal2(mean_temp),
+        fillOpacity = 1,
+        options = pathOptions(pane = "markersPane")
+      ) %>%
       clearControls() %>%
-      addLegend(position = "bottomleft",
-                pal = qpal,
-                values = data$mean_temp,
-                title = htmltools::HTML("<div style='text-align: center;'>°C</div>"),
-                opacity = 1,
-                na.label = "No data",
-                labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE))
+      addLegend(
+        position = "bottomleft",
+        pal = qpal,
+        values = data$mean_temp,
+        title = htmltools::HTML("<div style='text-align: center;'>°C</div>"),
+        opacity = 1,
+        na.label = "No data",
+        labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE))
       )
   })
   
-  # Reactive values to store the selected and previous station IDs
-  selected_station_id <- reactiveVal(NULL)
-  previous_station_id <- reactiveVal(NULL)
-  
-  # Update only the selected marker
+  # Update selected marker
   observeEvent(list(selected_station_id(), input$month, input$year_range), {
-    # Get the previous station ID
     previous_id <- previous_station_id()
-    # Ensure there is a selected ID
     if (!is.null(selected_station_id())) {
       data <- filtered_stations()
-      selected_id <- selected_station_id() # Assuming this function retrieves the selected station's ID
+      selected_id <- selected_station_id()
       
       selected_station <- data[data$ID == selected_id, ]
       bins <- 6
-      
-      # for having the same colors asn initial map - all markers
       qpal2 <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = TRUE)
       
-      # Check if there is a previous marker to remove
       if (!is.null(previous_id) && previous_id != selected_id) {
         selected_station_prev <- data[data$ID == previous_id, ]
-        print(selected_station_prev)
-        # Remove the previous marker
         leafletProxy("station_map", data = selected_station_prev) %>%
-          removeMarker(layerId = previous_id) |> 
-          addCircleMarkers(lng = ~LONGITUDE, lat = ~LATITUDE,
-                           radius = 5,  # Larger radius for the selected point
-                           label = ~paste("Station:", NAME, "<br>",
-                                          "ID:", ID, "<br>",
-                                          "Elevation:", STNELEV, "m<br>",
-                                          "Available years:", first_year, "-", last_year, "<br>",
-                                          "Selected years:", input$year_range[1], "-", input$year_range[2], "<br>",
-                                          "Mean Temp:", round(mean_temp, 1), "°C", 
-                                          "<br><span style='color:red;'>Click to get graph and data</span>") %>% 
-                             lapply(htmltools::HTML),
-                           layerId = ~ID,
-                           color = "grey", 
-                           weight = 1,  
-                           fillColor = ~qpal2(mean_temp),  # Same color fill
-                           fillOpacity = 1,
-                           options = pathOptions(pane = "markersPane"))
+          removeMarker(layerId = previous_id) %>%
+          addCircleMarkers(
+            lng = ~LONGITUDE, lat = ~LATITUDE,
+            radius = 5,
+            label = ~generateLabel(NAME, ID, STNELEV, first_year, last_year, mean_temp, input$year_range),
+            layerId = ~ID,
+            color = "grey",
+            weight = 1,
+            fillColor = ~qpal2(mean_temp),
+            fillOpacity = 1,
+            options = pathOptions(pane = "markersPane")
+          )
       }
       
-      # Update the previous station ID to the newly clicked station ID
       previous_station_id(selected_id)
       
       leafletProxy("station_map", data = selected_station) %>%
-        addCircleMarkers(lng = ~LONGITUDE, lat = ~LATITUDE,
-                         radius = 10,  # Larger radius for the selected point
-                         layerId = ~ID,
-                         color = "grey", 
-                         label = ~paste("Station:", NAME, "<br>",
-                                        "ID:", ID, "<br>",
-                                        "Elevation:", STNELEV, "m<br>",
-                                        "Available years:", first_year, "-", last_year, "<br>",
-                                        "Selected years:", input$year_range[1], "-", input$year_range[2], "<br>",
-                                        "Mean Temp:", round(mean_temp, 1), "°C", 
-                                        "<br><span style='color:red;'>Click to get graph and data</span>") %>% 
-                           lapply(htmltools::HTML),
-                         weight = 1,  
-                         fillColor = ~qpal2(selected_station$mean_temp),  # Same color fill
-                         fillOpacity = 1,
-                         options = pathOptions(pane = "markersPane"))
+        addCircleMarkers(
+          lng = ~LONGITUDE, lat = ~LATITUDE,
+          radius = 10,
+          layerId = ~ID,
+          color = "grey",
+          label = ~generateLabel(NAME, ID, STNELEV, first_year, last_year, mean_temp, input$year_range),
+          weight = 1,
+          fillColor = ~qpal2(selected_station$mean_temp),
+          fillOpacity = 1,
+          options = pathOptions(pane = "markersPane")
+        )
     }
   })
+  
+  
+  
   # Reactive expression to retrieve time series data for the selected station and year/month inputs
   time_series_data <- reactive({
     req(input$station_map_marker_click$id)  # Ensure a station is clicked
