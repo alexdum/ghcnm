@@ -8,6 +8,7 @@ library(arrow) # For reading Parquet files
 library(scales) # For color scaling
 library(plotly)
 source("utils/render_time_series_plot.R", local = T)
+source("utils/generateLabel.R", local = T)
 
 # Read the metadata and availability data
 tavg_meta <- read.csv("www/data/tabs/tavg_meta.csv")
