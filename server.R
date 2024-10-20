@@ -78,9 +78,9 @@ shinyServer(function(input, output, session) {
       )
   })
   
-  observe({
+  # Initial rendering of all markers
+  observeEvent(filtered_stations(), {
     data <- filtered_stations()
-    #selected_id <- selected_station_id()
     
     # Define a bin-based color palette for temperature values
     bins <- 6
@@ -89,8 +89,8 @@ shinyServer(function(input, output, session) {
     
     leafletProxy("station_map", data = data) %>%
       clearMarkers() %>%
-      addCircleMarkers(lng = data$LONGITUDE, lat = data$LATITUDE,
-                       radius = 5,  # Apply dynamic radius
+      addCircleMarkers(lng = ~LONGITUDE, lat = ~LATITUDE,
+                       radius = 5,  # Default radius for all points
                        layerId = ~ID,
                        label = ~paste("Station:", NAME, "<br>",
                                       "ID:", ID, "<br>",
@@ -116,7 +116,72 @@ shinyServer(function(input, output, session) {
       )
   })
   
+  # Reactive values to store the selected and previous station IDs
+  selected_station_id <- reactiveVal(NULL)
+  previous_station_id <- reactiveVal(NULL)
   
+  # Update only the selected marker
+  observeEvent(list(selected_station_id(), input$month, input$year_range), {
+    # Get the previous station ID
+    previous_id <- previous_station_id()
+    # Ensure there is a selected ID
+    if (!is.null(selected_station_id())) {
+      data <- filtered_stations()
+      selected_id <- selected_station_id() # Assuming this function retrieves the selected station's ID
+      
+      selected_station <- data[data$ID == selected_id, ]
+      bins <- 6
+      
+      # for having the same colors asn initial map - all markers
+      qpal2 <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = TRUE)
+      
+      # Check if there is a previous marker to remove
+      if (!is.null(previous_id) && previous_id != selected_id) {
+        selected_station_prev <- data[data$ID == previous_id, ]
+        print(selected_station_prev)
+        # Remove the previous marker
+        leafletProxy("station_map", data = selected_station_prev) %>%
+          removeMarker(layerId = previous_id) |> 
+          addCircleMarkers(lng = ~LONGITUDE, lat = ~LATITUDE,
+                           radius = 5,  # Larger radius for the selected point
+                           label = ~paste("Station:", NAME, "<br>",
+                                          "ID:", ID, "<br>",
+                                          "Elevation:", STNELEV, "m<br>",
+                                          "Available years:", first_year, "-", last_year, "<br>",
+                                          "Selected years:", input$year_range[1], "-", input$year_range[2], "<br>",
+                                          "Mean Temp:", round(mean_temp, 1), "°C", 
+                                          "<br><span style='color:red;'>Click to get graph and data</span>") %>% 
+                             lapply(htmltools::HTML),
+                           layerId = ~ID,
+                           color = "grey", 
+                           weight = 1,  
+                           fillColor = ~qpal2(mean_temp),  # Same color fill
+                           fillOpacity = 1,
+                           options = pathOptions(pane = "markersPane"))
+      }
+      
+      # Update the previous station ID to the newly clicked station ID
+      previous_station_id(selected_id)
+      
+      leafletProxy("station_map", data = selected_station) %>%
+        addCircleMarkers(lng = ~LONGITUDE, lat = ~LATITUDE,
+                         radius = 10,  # Larger radius for the selected point
+                         layerId = ~ID,
+                         color = "grey", 
+                         label = ~paste("Station:", NAME, "<br>",
+                                        "ID:", ID, "<br>",
+                                        "Elevation:", STNELEV, "m<br>",
+                                        "Available years:", first_year, "-", last_year, "<br>",
+                                        "Selected years:", input$year_range[1], "-", input$year_range[2], "<br>",
+                                        "Mean Temp:", round(mean_temp, 1), "°C", 
+                                        "<br><span style='color:red;'>Click to get graph and data</span>") %>% 
+                           lapply(htmltools::HTML),
+                         weight = 1,  
+                         fillColor = ~qpal2(selected_station$mean_temp),  # Same color fill
+                         fillOpacity = 1,
+                         options = pathOptions(pane = "markersPane"))
+    }
+  })
   # Reactive expression to retrieve time series data for the selected station and year/month inputs
   time_series_data <- reactive({
     req(input$station_map_marker_click$id)  # Ensure a station is clicked
@@ -141,7 +206,6 @@ shinyServer(function(input, output, session) {
   })
   
   
-  
   # Observer to handle rendering of the time series plot when inputs (month, year) or station selection change
   output$time_series_plot <- renderPlotly({
     data <- time_series_data()  # Get the filtered time series data
@@ -153,10 +217,6 @@ shinyServer(function(input, output, session) {
     render_time_series_plot(data, station_id, month)
     
   })
-  
-  
-  # Initialize a reactive value to store the clicked or selected station ID
-  selected_station_id <- reactiveVal(NULL) 
   
   # Observe to handle click events on the map markers and update plot accordingly
   observeEvent(input$station_map_marker_click, {
