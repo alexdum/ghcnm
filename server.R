@@ -80,46 +80,29 @@ shinyServer(function(input, output, session) {
   
   observe({
     data <- filtered_stations()
-    selected_id <- selected_station_id()
-
+    #selected_id <- selected_station_id()
+    
     # Define a bin-based color palette for temperature values
     bins <- 6
     qpal <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = FALSE)
     qpal2 <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = TRUE)
     
-    # Check for null selected_id before assigning radius and border color/weight
-    radius <- if (!is.null(selected_id)) {
-      ~ifelse(ID == selected_id, 8, 5)
-    } else {
-      ~5  # Default radius for all markers
-    }
-    
-    # Define color and border thickness (weight) based on whether a station is selected
-    border_color <- if (!is.null(selected_id)) {
-      ~ifelse(ID == selected_id, "red", "grey")  # Red border for selected, black for others
-    } else {
-      ~"grey"  # Default border color for all markers
-    }
-    
-    border_weight <- if (!is.null(selected_id)) {
-      ~ifelse(ID == selected_id, 3, 1)  # Thicker border for selected station
-    } else {
-      ~1  # Default border thickness
-    }
     
     leafletProxy("station_map", data = data) %>%
       clearMarkers() %>%
       addCircleMarkers(lng = data$LONGITUDE, lat = data$LATITUDE,
-                       radius = radius,  # Apply dynamic radius
+                       radius = 5,  # Apply dynamic radius
                        layerId = ~ID,
-                       popup = ~paste("Station:", NAME, "<br>",
+                       label = ~paste("Station:", NAME, "<br>",
                                       "ID:", ID, "<br>",
                                       "Elevation:", STNELEV, "m<br>",
                                       "Available years:", first_year, "-", last_year, "<br>",
                                       "Selected years:", input$year_range[1], "-", input$year_range[2], "<br>",
-                                      "Mean Temp:", round(mean_temp, 2), "°C"),
-                       color = border_color,  # Dynamic border color (red for selected)
-                       weight = border_weight,  # Dynamic border thickness (3 for selected)
+                                      "Mean Temp:", round(mean_temp, 2), "°C", 
+                                      "<br><span style='color:red;'>Click to get graph and data</span>") %>% 
+                         lapply(htmltools::HTML),
+                       color = "grey", 
+                       weight = 1,  
                        fillColor = ~qpal2(mean_temp),  # Color fill based on temperature
                        fillOpacity = 1,
                        options = pathOptions(pane = "markersPane")) %>%
