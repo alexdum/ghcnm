@@ -80,18 +80,37 @@ shinyServer(function(input, output, session) {
   
   observe({
     data <- filtered_stations()
-    
+    selected_id <- selected_station_id()
+
     # Define a bin-based color palette for temperature values
-    bins <- 6  # Specify the number of bins
+    bins <- 6
     qpal <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = FALSE)
     qpal2 <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = TRUE)
     
+    # Check for null selected_id before assigning radius and border color/weight
+    radius <- if (!is.null(selected_id)) {
+      ~ifelse(ID == selected_id, 8, 5)
+    } else {
+      ~5  # Default radius for all markers
+    }
+    
+    # Define color and border thickness (weight) based on whether a station is selected
+    border_color <- if (!is.null(selected_id)) {
+      ~ifelse(ID == selected_id, "red", "grey")  # Red border for selected, black for others
+    } else {
+      ~"grey"  # Default border color for all markers
+    }
+    
+    border_weight <- if (!is.null(selected_id)) {
+      ~ifelse(ID == selected_id, 3, 1)  # Thicker border for selected station
+    } else {
+      ~1  # Default border thickness
+    }
+    
     leafletProxy("station_map", data = data) %>%
       clearMarkers() %>%
-      
-      # Add markers to the custom pane with lower zIndex
       addCircleMarkers(lng = data$LONGITUDE, lat = data$LATITUDE,
-                       radius = 5, 
+                       radius = radius,  # Apply dynamic radius
                        layerId = ~ID,
                        popup = ~paste("Station:", NAME, "<br>",
                                       "ID:", ID, "<br>",
@@ -99,20 +118,22 @@ shinyServer(function(input, output, session) {
                                       "Available years:", first_year, "-", last_year, "<br>",
                                       "Selected years:", input$year_range[1], "-", input$year_range[2], "<br>",
                                       "Mean Temp:", round(mean_temp, 2), "°C"),
-                       color = ~qpal2(mean_temp), fillOpacity = 1,
+                       color = border_color,  # Dynamic border color (red for selected)
+                       weight = border_weight,  # Dynamic border thickness (3 for selected)
+                       fillColor = ~qpal2(mean_temp),  # Color fill based on temperature
+                       fillOpacity = 1,
                        options = pathOptions(pane = "markersPane")) %>%
-      
       clearControls() %>%
-      
-      addLegend(position = "bottomleft",  # Position the legend at the lower right
-                pal = qpal,                # Use the previously defined color palette
-                values = data$mean_temp,    # The values to map to the color scale
-                title = htmltools::HTML("<div style='text-align: center;'>°C</div>"),  # Align title to the left using HTML
-                opacity = 1,             # Set opacity of the legend
+      addLegend(position = "bottomleft",
+                pal = qpal,
+                values = data$mean_temp,
+                title = htmltools::HTML("<div style='text-align: center;'>°C</div>"),
+                opacity = 1,
                 na.label = "No data",
                 labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE))
-      )  # Reverse the order of intervals in the legend
+      )
   })
+  
   
   # Reactive expression to retrieve time series data for the selected station and year/month inputs
   time_series_data <- reactive({
@@ -144,7 +165,7 @@ shinyServer(function(input, output, session) {
     data <- time_series_data()  # Get the filtered time series data
     req(nrow(data) > 0)  # Ensure there is data to plot
     
-    station_id <- input$station_map_marker_click$id
+    station_id <- selected_station_id()
     month <- input$month
     
     render_time_series_plot(data, station_id, month)
@@ -152,10 +173,19 @@ shinyServer(function(input, output, session) {
   })
   
   
+  # Initialize a reactive value to store the clicked or selected station ID
+  selected_station_id <- reactiveVal(NULL) 
+  
+  # Observe to handle click events on the map markers and update plot accordingly
+  observeEvent(input$station_map_marker_click, {
+    selected_station_id(input$station_map_marker_click$id)
+  })
+  
+  
   # Observer to handle click events on the map markers and update plot accordingly
   observeEvent(input$station_map_marker_click, {
     # Trigger the time series plot update based on the clicked station
-    station_id <- input$station_map_marker_click$id
+    station_id <- selected_station_id()
     
     # Update the time series plot when a station is clicked
     output$time_series_plot <- renderPlotly({
@@ -173,7 +203,7 @@ shinyServer(function(input, output, session) {
   observe({
     req(input$month, input$year_range)  # Ensure month and year range inputs are provided
     
-    station_id <- input$station_map_marker_click$id
+    station_id <- selected_station_id()
     month <- input$month
     
     # Update the time series plot when month or year inputs change
@@ -189,7 +219,7 @@ shinyServer(function(input, output, session) {
   
   # Create a reactive flag indicating whether the plot is available
   plot_available <- reactive({
-    req(input$station_map_marker_click$id)
+    req(selected_station_id())
     nrow(time_series_data()) > 0
   })
   
@@ -233,7 +263,7 @@ shinyServer(function(input, output, session) {
   output$download_data <- downloadHandler(
     filename = function() {
       # Create a dynamic filename based on station ID and month
-      station_id <- input$station_map_marker_click$id
+      station_id <- selected_station_id()
       month <- input$month
       paste0(tavg_meta$NAME[tavg_meta$ID == station_id],"_", station_id, "_", month,".csv")
     },
