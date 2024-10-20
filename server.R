@@ -87,7 +87,6 @@ shinyServer(function(input, output, session) {
     qpal <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = FALSE)
     qpal2 <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = TRUE)
     
-    
     leafletProxy("station_map", data = data) %>%
       clearMarkers() %>%
       addCircleMarkers(lng = data$LONGITUDE, lat = data$LATITUDE,
@@ -98,7 +97,7 @@ shinyServer(function(input, output, session) {
                                       "Elevation:", STNELEV, "m<br>",
                                       "Available years:", first_year, "-", last_year, "<br>",
                                       "Selected years:", input$year_range[1], "-", input$year_range[2], "<br>",
-                                      "Mean Temp:", round(mean_temp, 2), "°C", 
+                                      "Mean Temp:", round(mean_temp, 1), "°C", 
                                       "<br><span style='color:red;'>Click to get graph and data</span>") %>% 
                          lapply(htmltools::HTML),
                        color = "grey", 
