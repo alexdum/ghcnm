@@ -1,6 +1,6 @@
 ##### Data
 
-We have used the GHCNm Version 4 dataset available here: <a href="https://www.ncei.noaa.gov/pub/data/ghcn" target="_blank">www.ncei.noaa.gov/pub/data/ghcn</a>
+We have used the GHCNm Version 4 dataset available here: <a href="https://www.ncei.noaa.gov/data/global-historical-climatology-network-monthly/v4/archive/" target="_blank">https://www.ncei.noaa.gov/data/global-historical-climatology-network-monthly/v4/archive/</a>
 
 ##### Source code
 
