@@ -10,7 +10,7 @@ render_time_series_plot <- function(data, station_id, month) {
   
   # Create the title with slope
   title_text <- paste(
-    station_id, tavg_meta$NAME[tavg_meta$ID == station_id]
+    month, station_id, tavg_meta$NAME[tavg_meta$ID == station_id]
   )
   
   # Main plot
