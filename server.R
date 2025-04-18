@@ -1,5 +1,5 @@
 # Define the server logic
-shinyServer(function(input, output, session) {
+function(input, output, session) {
   
   # Reactive expression to filter the Parquet data by year and month
   filtered_parquet_data <- reactive({
@@ -287,4 +287,5 @@ shinyServer(function(input, output, session) {
   )
   
   
-})
+}
+
