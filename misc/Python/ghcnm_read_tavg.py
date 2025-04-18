@@ -54,7 +54,7 @@ def read_ghcnm_data(file_path):
 
 
 # Example usage:
-data = read_ghcnm_data('misc/data/ghcnm.v4.0.1.20240924/ghcnm.tavg.v4.0.1.20240924.qcf.dat')
+data = read_ghcnm_data('misc/data/ghcnm.tavg.v4.0.1.20250417.qcf.dat')
 print(data.head()) 
 
 # Assuming your data is already loaded into a dataframe called 'filtered_data'
