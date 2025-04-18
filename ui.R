@@ -1,6 +1,8 @@
 # Define the UI using bslib's page_sidebar layout
 ui <- page_navbar(
   theme = bs_theme(version = 5),
+
+  navbar_options = navbar_options(collapsible = TRUE),
   
   # Add the canonical link and noindex meta tag inside the head tag
   tags$head(
@@ -10,7 +12,7 @@ ui <- page_navbar(
   ),
   
   fillable_mobile = T,
-  collapsible = T,
+  
   nav_panel(
     "Data Explorer",
     #   layout_sidebar(
