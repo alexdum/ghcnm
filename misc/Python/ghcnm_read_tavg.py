@@ -53,8 +53,45 @@ def read_ghcnm_data(file_path):
   return df
 
 
+# download file
+
+import tarfile
+import os
+from urllib.request import urlretrieve
+
+
+url = "https://www.ncei.noaa.gov/pub/data/ghcn/v4/ghcnm.tavg.latest.qcf.tar.gz"
+filename = os.path.join('misc/data', "ghcnm.tavg.latest.qcf.tar.gz")
+
+urlretrieve(url, filename)
+
+with tarfile.open(filename, 'r:gz') as tar:
+    tar.extractall(path='misc/data')
+    
+    
+def find_inv_file(directory, extension):
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith(extension):
+                return os.path.join(root, file)
+    return None
+
+dat_file = find_inv_file('misc/data', '.dat')
+
+
+meta_file = find_inv_file('misc/data', '.inv')
+
+# copy file meta_file to www/data/tabs and change the name of the filein tab_meta.txt
+! cp $meta_file www/data/tabs/tavg_meta.txt
+
+
+
+
+
+
+
 # Example usage:
-data = read_ghcnm_data('misc/data/ghcnm.tavg.v4.0.1.20250417.qcf.dat')
+data = read_ghcnm_data(dat_file)
 print(data.head()) 
 
 # Assuming your data is already loaded into a dataframe called 'filtered_data'
@@ -87,21 +124,25 @@ print(station_summary)
 station_summary.to_csv("www/data/tabs/tavg_vaialability.csv", index=False)
 
 
+# remove all folders and files 
+! rm -rf misc/data/*.*
 
 
 
 
-from huggingface_hub import HfApi
-api = HfApi()
 
-# Upload all the content from the local folder to your remote Space.
-# By default, files are uploaded at the root of the repo
-api.upload_folder(
-    folder_path="~/Documents/clima/2024/climate/www/data",
-    path_in_repo="www",
-    repo_id="alexdum/climate",
-    repo_type="space"
-)
+
+# from huggingface_hub import HfApi
+# api = HfApi()
+# 
+# # Upload all the content from the local folder to your remote Space.
+# # By default, files are uploaded at the root of the repo
+# api.upload_folder(
+#     folder_path="~/Documents/clima/2024/climate/www/data",
+#     path_in_repo="www",
+#     repo_id="alexdum/climate",
+#     repo_type="space"
+# )
 
 
 
