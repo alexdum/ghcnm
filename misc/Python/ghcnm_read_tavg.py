@@ -153,18 +153,7 @@ meta.to_csv('www/data/tabs/tavg_meta.csv', index=False)
 
 
 
-# from huggingface_hub import HfApi
-# api = HfApi()
-# 
-# # Upload all the content from the local folder to your remote Space.
-# # By default, files are uploaded at the root of the repo
-# api.upload_folder(
-#     folder_path="~/Documents/clima/2024/climate/www/data",
-#     path_in_repo="www",
-#     repo_id="alexdum/climate",
-#     repo_type="space"
-# )
-
+# https://climatecharts.net/
 
 
 
