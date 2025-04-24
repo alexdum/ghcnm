@@ -79,17 +79,6 @@ def find_inv_file(directory, extension):
 dat_file = find_inv_file('misc/data', '.dat')
 
 
-meta_file = find_inv_file('misc/data', '.inv')
-
-# copy file meta_file to www/data/tabs and change the name of the filein tab_meta.txt
-! cp $meta_file www/data/tabs/tavg_meta.txt
-
-
-
-
-
-
-
 # Example usage:
 data = read_ghcnm_data(dat_file)
 print(data.head()) 
@@ -124,8 +113,40 @@ print(station_summary)
 station_summary.to_csv("www/data/tabs/tavg_vaialability.csv", index=False)
 
 
+### read text  file 
+# misc/data/ghcnm.v4.0.1.20250423/ghcnm.tavg.v4.0.1.20250423.qcf.inv
+
+meta_file = find_inv_file('misc/data', '.inv')
+
+# Define column specifications (start index is 0-based in pandas)
+colspecs = [
+    (0, 11),   # ID (1-11)
+    (12, 20),  # LATITUDE (13-20)
+    (21, 30),  # LONGITUDE (22-30)
+    (31, 37),  # STNELEV (32-37)
+    (38, 68)   # NAME (39-68)
+]
+
+# Define column names
+column_names = ['ID', 'LATITUDE', 'LONGITUDE', 'STNELEV', 'NAME']
+
+# Read the fixed-width formatted file
+meta = pd.read_fwf(meta_file, colspecs=colspecs, names=column_names)
+
+# Replace missing elevation values -999.0 with NaN
+meta['STNELEV'] = meta['STNELEV'].replace(-999.0, pd.NA)
+
+# Show the first few rows
+print(meta.head())
+
+# Write the DataFrame to a CSV file
+meta.to_csv('www/data/tabs/tavg_meta.csv', index=False)
+
+
+
+
 # remove all folders and files 
-! rm -rf misc/data/*.*
+!rm -rf misc/data/*.*
 
 
 
