@@ -6,6 +6,8 @@ import tarfile
 import glob
 import pandas as pd
 from pandas.errors import EmptyDataError, ParserError
+import sys
+
 
 
 
@@ -90,22 +92,42 @@ dataframes = []
 
 for i, file in enumerate(csv_files):
     print(f"Processing file {i+1}/{len(csv_files)}: {file}")
+    
     df = pd.read_fwf(
-                file,
-                colspecs=colspecs,
-                names=column_names,
-                dtype=dtypes, # Apply defined data types
-                header=None # Important: Ensure pandas doesn't look for a header row
-            )
+        file,
+        colspecs=colspecs,
+        names=column_names,
+        dtype=dtypes,  # Apply defined data types
+        header=None    # Important: Ensure pandas doesn't look for a header row
+    )
+
     # 1. Parse 'year_month' into 'year' and 'month' columns
     df['year'] = pd.to_numeric(df['year_month'].str[:4], errors='coerce').astype('Int16')
     df['month'] = pd.to_numeric(df['year_month'].str[4:], errors='coerce').astype('Int8')
-    df.drop('year_month', axis=1, inplace=True) # Drop the original column
+    df.drop('year_month', axis=1, inplace=True)  # Drop the original column
+
     # 2. Handle Trace Precipitation (-1 becomes 0)
     df['precip_tenths_mm'] = df['precip_tenths_mm'].replace(-1, 0)
+
     # 3. Create precipitation column in millimeters (float)
     df['precip_mm'] = (df['precip_tenths_mm'].astype('Float32') / 10.0).round(1)
+    
+    # remove rows qith quality flags == O, or R, or T, or S, or K
+    df = df[df['quality_flag'] != 'O']
+    df = df[df['quality_flag'] != 'R']
+    df = df[df['quality_flag'] != 'T']
+    df = df[df['quality_flag'] != 'S']
+    df = df[df['quality_flag'] != 'K']
+    
+    # skip is number of rows is  less than 120
+    if len(df) < 120:
+        continue
+    # 4. Skip this file if any 'precip_mm' value is greater than 5000
+    if (df['precip_mm'] > 2000).any():
+        #continue
+        sys.exit(1)
 
+    # 5. Append cleaned and filtered dataframe
     dataframes.append(df)
 
 combined_df = pd.concat(dataframes, ignore_index=True)
@@ -118,4 +140,6 @@ combined_df.to_parquet('www/data/tabs/prec_long.parquet', engine='pyarrow', inde
 !rm -rf misc/data/*
 
 combined_df.describe()
+
+
 
