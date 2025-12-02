@@ -147,13 +147,18 @@ meta.to_csv('www/data/tabs/tavg_meta.csv', index=False)
 
 # remove all folders and files 
 import glob
-files_to_remove = glob.glob('misc/data/*.*')
-for f in files_to_remove:
-    os.remove(f)
+import shutil
+
+items_to_remove = glob.glob('misc/data/*')
+for item_path in items_to_remove:
+    try:
+        if os.path.isfile(item_path) or os.path.islink(item_path):
+            os.remove(item_path)
+        elif os.path.isdir(item_path):
+            shutil.rmtree(item_path)
+    except Exception as e:
+        print(f'Failed to delete {item_path}. Reason: {e}')
  
-
-
-
 
 
 # https://climatecharts.net/
