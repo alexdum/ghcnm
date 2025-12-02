@@ -146,16 +146,14 @@ meta.to_csv('www/data/tabs/tavg_meta.csv', index=False)
 
 
 # remove all folders and files 
-!rm -rf misc/data/*.*
-
+import glob
+files_to_remove = glob.glob('misc/data/*.*')
+for f in files_to_remove:
+    os.remove(f)
+ 
 
 
 
 
 
 # https://climatecharts.net/
-
-
-
-
-
