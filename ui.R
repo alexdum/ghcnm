@@ -1,6 +1,7 @@
 # Define the UI using bslib's page_sidebar layout
 ui <- page_navbar(
   theme = bs_theme(version = 5),
+  title = "GHCNm Explorer",
 
   navbar_options = navbar_options(collapsible = TRUE),
   
