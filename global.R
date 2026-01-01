@@ -7,7 +7,7 @@ library(leaflet.extras)
 library(arrow) # For reading Parquet files
 library(scales) # For color scaling
 library(plotly)
-
+library(bsicons)
 
 
 source("utils/render_time_series_plot.R", local = T)
