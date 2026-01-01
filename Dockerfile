@@ -12,7 +12,8 @@ RUN install2.r --error \
     leaflet.extras \
     markdown \
     plotly \
-    orca
+    orca \
+    bsicons
 
 # Install development packages from GitHub
 RUN installGithub.r \
