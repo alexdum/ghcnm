@@ -1,7 +1,17 @@
 /* Style for the custom download button */
 .custom-download-button {
-  background: transparent; /* Make background transparent */
-  border: none;            /* Remove borders */
-  padding: 0;              /* Remove padding */
-  cursor: pointer;         /* Change cursor to pointer on hover */
+  background: transparent;
+  /* Make background transparent */
+  border: none;
+  /* Remove borders */
+  padding: 0;
+  /* Remove padding */
+  cursor: pointer;
+  /* Change cursor to pointer on hover */
+}
+
+/* Increase text size in the hover panel (tooltip) */
+.leaflet-tooltip {
+  font-size: 20px !important;
+  line-height: 1.8 !important;
 }

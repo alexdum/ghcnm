@@ -63,12 +63,6 @@ ui <- page_navbar(
     # Use uiOutput to conditionally render the plot panel
     uiOutput("plot_panel")
   ),
-  nav_panel(
-    "Info",
-    card(
-      includeMarkdown("www/md/info_tavg.md") # Load external HTML file
-    )
-  ),
   nav_spacer(),
   nav_item(
     tooltip(
