@@ -3,9 +3,7 @@ ui <- page_navbar(
   theme = bs_theme(version = 5),
   title = "GHCNm Explorer",
   navbar_options = navbar_options(collapsible = TRUE),
-
-  # Add the canonical link and noindex meta tag inside the head tag
-  tags$head(
+  header = tags$head(
     tags$link(rel = "canonical", href = "https://climate-insights.netlify.app/ghcnm"),
     tags$meta(name = "robots", content = "noindex,indexifembedded"),
     tags$link(rel = "stylesheet", type = "text/css", href = "custom.css"), # Link to custom CSS
@@ -51,6 +49,12 @@ ui <- page_navbar(
         value = c(1961, max(stations_data$last_year, na.rm = TRUE)),
         step = 1,
         sep = ""
+      ),
+
+      # Select input for parameter
+      selectInput("parameter", "Select Parameter:",
+        choices = c("Temperature", "Precipitation"),
+        selected = "Temperature"
       ),
 
       # Select input for choosing a month

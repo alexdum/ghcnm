@@ -21,7 +21,9 @@ tavg_avail <- read.csv("www/data/tabs/tavg_availability.csv")
 stations_data <- merge(tavg_meta, tavg_avail, by = "ID")
 
 # Open the Parquet dataset using arrow
+# Open the Parquet dataset using arrow
 tavg_dataset <- open_dataset("www/data/tabs/tavg_long.parquet")
+prec_dataset <- open_dataset("www/data/tabs/prec_long.parquet")
 
 # Read country codes
 country_codes <- read.table("www/data/tabs/ghcnd-countries.txt", fill = TRUE, quote = "", comment.char = "")
@@ -41,4 +43,27 @@ country_codes_df <- data.frame(
 )
 
 stations_data <- stations_data %>%
+    left_join(country_codes_df, by = "CountryCode")
+
+
+# Read the precipitation metadata and availability data
+# Read the precipitation metadata and availability data
+prec_meta <- read.csv("www/data/tabs/prec_meta.csv")
+# Rename columns to match tavg_meta convention for consistent server logic
+prec_meta <- prec_meta %>%
+    rename(
+        ID = GHCN_ID,
+        LATITUDE = Latitude,
+        LONGITUDE = Longitude,
+        STNELEV = Elevation,
+        NAME = Station_Name
+    )
+
+prec_avail <- read.csv("www/data/tabs/prec_availability.csv")
+
+# Merge the metadata and availability data on 'ID'
+prec_stations_data <- merge(prec_meta, prec_avail, by = "ID")
+
+prec_stations_data$CountryCode <- substr(prec_stations_data$ID, 1, 2)
+prec_stations_data <- prec_stations_data %>%
     left_join(country_codes_df, by = "CountryCode")

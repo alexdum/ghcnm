@@ -12,6 +12,6 @@
 
 /* Increase text size in the hover panel (tooltip) */
 .leaflet-tooltip {
-  font-size: 20px !important;
-  line-height: 1.8 !important;
+  font-size: 14px !important;
+  line-height: 1.2 !important;
 }

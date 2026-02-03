@@ -4,8 +4,11 @@ function(input, output, session) {
   filtered_parquet_data <- reactive({
     month_number <- match(input$month, month.name)
 
+    # Determine which dataset to use based on input parameter
+    dataset <- if (input$parameter %in% c("Temperature", "Air Temperature")) tavg_dataset else prec_dataset
+
     # Filter the dataset using arrow's dplyr interface
-    tavg_dataset %>%
+    dataset %>%
       filter(
         VALUE >= -90,
         YEAR >= input$year_range[1],
@@ -13,15 +16,21 @@ function(input, output, session) {
         MONTH == month_number
       ) %>%
       group_by(ID) %>%
-      summarize(mean_temp = mean(VALUE, na.rm = TRUE)) %>%
+      # For precipitation, we might want sum instead of mean if it was daily, but these are likely monthly means/totals?
+      # Assuming monthly values are already means for temp and totals for precip.
+      # If we aggregate over years (multiannual mean), we want mean of the monthly values.
+      summarize(mean_value = mean(VALUE, na.rm = TRUE)) %>%
       collect() # Collect only the filtered and summarized data
   })
 
   # Reactive expression to filter the stations based on year range and Parquet data
   filtered_stations <- reactive({
     filtered_data <- filtered_parquet_data()
-    # Join filtered mean temperature data with station data
-    stations_data %>%
+    # Determine which station metadata to use
+    stations_info <- if (input$parameter %in% c("Temperature", "Air Temperature")) stations_data else prec_stations_data
+
+    # Join filtered data with station data
+    stations_info %>%
       filter(
         first_year <= input$year_range[1],
         last_year >= input$year_range[2],
@@ -76,12 +85,65 @@ function(input, output, session) {
   })
 
   # Initial rendering of all markers
+  # Initial rendering of all markers
   observeEvent(filtered_stations(), {
     data <- filtered_stations()
+    param <- input$parameter
 
-    bins <- 6
-    qpal <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = FALSE)
-    qpal2 <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = TRUE)
+    # Define color palette and units based on parameter
+    if (param %in% c("Temperature", "Air Temperature")) {
+      palette_domain <- data$mean_value
+      # Detailed bins centered on 0, extended to cover extremes (-90 to 60)
+      bins <- c(-90, -40, -30, -20, -15, -12.5, -10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30, 35, 40, 60)
+
+      # Custom palette:
+      # 10 negative intervals: -90..-40, -40..-30, ... -2.5..0
+      # 15 positive intervals: 0..2.5, ... 40..60
+
+      blues <- colorRampPalette(c("#053061", "#4393c3", "#d1e5f0"))(10)
+      reds <- colorRampPalette(c("#fff7bc", "#fdae61", "#d73027", "#67001f"))(15)
+      palette_name <- c(blues, reds)
+
+      reverse <- FALSE # Custom palette is already ordered Blue -> Red
+      units <- "°C"
+      value_label_prefix <- "Mean Temp:"
+    } else {
+      palette_domain <- data$mean_value
+      # Use interpolated palette because we have > 9 bins
+      palette_name <- colorRampPalette(RColorBrewer::brewer.pal(9, "YlGnBu"))(12)
+      reverse <- FALSE # Darker for more rain
+      units <- "mm"
+      value_label_prefix <- "Mean Precip:"
+      # Use detailed bins for precipitation to see low values better, extended to Inf
+      bins <- c(0, 10, 25, 50, 75, 100, 150, 200, 300, 500, 1000, 2000, Inf)
+    }
+    # Creating palettes
+    # For legend (we want standard direction usually, but let's match the map logic)
+    # Actually, leaflet legend usually goes low -> high bottom -> top.
+    # We construct qpal for the specific domain and direction
+
+    qpal <- colorBin(palette_name, domain = palette_domain, bins = bins, na.color = "transparent", reverse = FALSE)
+    # qpal2 is used for fillColor, often we want to reverse RdYlBu so red is high.
+    # For independent control, let's explicitly set reverse map
+    qpal_fill <- colorBin(palette_name, domain = palette_domain, bins = bins, na.color = "transparent", reverse = reverse)
+
+
+    # Generate custom labels for legend
+    n_bins <- length(bins)
+    labels <- character(n_bins - 1)
+    for (i in 1:(n_bins - 1)) {
+      if (is.infinite(bins[i + 1])) {
+        labels[i] <- paste0("> ", bins[i])
+      } else {
+        # Optional: format numbers to remove decimals if integers?
+        # For now simple paste is fine, R handles printing.
+        labels[i] <- paste0(bins[i], " - ", bins[i + 1])
+      }
+    }
+
+    # Reverse for legend (High values at top)
+    legend_colors <- rev(palette_name)
+    legend_labels <- rev(labels)
 
     leafletProxy("station_map", data = data) %>%
       clearMarkers() %>%
@@ -89,81 +151,109 @@ function(input, output, session) {
         lng = ~LONGITUDE, lat = ~LATITUDE,
         radius = 5,
         layerId = ~ID,
-        label = ~ generateLabel(NAME, ID, STNELEV, first_year, last_year, mean_temp, input$year_range, Country),
+        label = ~ generateLabel(NAME, ID, STNELEV, first_year, last_year, mean_value, input$year_range, Country, value_label_prefix, units),
         color = "grey",
         weight = 1,
-        fillColor = ~ qpal2(mean_temp),
+        fillColor = ~ qpal_fill(mean_value),
         fillOpacity = 1,
         options = pathOptions(pane = "markersPane")
       ) %>%
       clearControls() %>%
       addLegend(
         position = "bottomleft",
-        pal = qpal,
-        values = data$mean_temp,
-        title = htmltools::HTML("<div style='text-align: center;'>°C</div>"),
-        opacity = 1,
-        na.label = "No data",
-        labFormat = labelFormat(transform = function(x) sort(x, decreasing = TRUE))
+        colors = legend_colors,
+        labels = legend_labels,
+        title = htmltools::HTML(paste0("<div style='text-align: center;'>", units, "</div>")),
+        opacity = 1
       )
   })
 
   # Update selected marker
-  observeEvent(list(selected_station_id(), input$month, input$year_range), {
+  observeEvent(list(selected_station_id(), input$month, input$year_range, input$parameter), {
     previous_id <- previous_station_id()
     if (!is.null(selected_station_id())) {
       data <- filtered_stations()
       selected_id <- selected_station_id()
+      param <- input$parameter
+
+      # Define color palette and units based on parameter (Duplicate logic, ideally refactor into function)
+      # Define color palette and units based on parameter (Duplicate logic, ideally refactor into function)
+      if (param %in% c("Temperature", "Air Temperature")) {
+        palette_domain <- data$mean_value
+        # Detailed bins centered on 0 with 2.5 degree steps, extended range
+        bins <- c(-90, -40, -30, -20, -15, -12.5, -10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30, 35, 40, 60)
+        # Custom palette: 10 blues, 15 reds
+        blues <- colorRampPalette(c("#053061", "#4393c3", "#d1e5f0"))(10)
+        reds <- colorRampPalette(c("#fff7bc", "#fdae61", "#d73027", "#67001f"))(15)
+        palette_name <- c(blues, reds)
+
+        reverse <- FALSE
+        units <- "°C"
+        value_label_prefix <- "Mean Temp:"
+      } else {
+        palette_domain <- data$mean_value
+        # Use interpolated palette
+        palette_name <- colorRampPalette(RColorBrewer::brewer.pal(9, "YlGnBu"))(12)
+        reverse <- FALSE
+        units <- "mm"
+        value_label_prefix <- "Mean Precip:"
+        bins <- c(0, 10, 25, 50, 75, 100, 150, 200, 300, 500, 1000, 2000, Inf)
+      }
 
       selected_station <- data[data$ID == selected_id, ]
-      bins <- 6
-      qpal2 <- colorBin("RdYlBu", domain = data$mean_temp, bins = bins, na.color = "transparent", reverse = TRUE)
+      qpal_fill <- colorBin(palette_name, domain = palette_domain, bins = bins, na.color = "transparent", reverse = reverse)
 
       if (!is.null(previous_id) && previous_id != selected_id) {
         selected_station_prev <- data[data$ID == previous_id, ]
-        leafletProxy("station_map", data = selected_station_prev) %>%
-          removeMarker(layerId = previous_id) %>%
-          addCircleMarkers(
-            lng = ~LONGITUDE, lat = ~LATITUDE,
-            radius = 5,
-            label = ~ generateLabel(NAME, ID, STNELEV, first_year, last_year, mean_temp, input$year_range, Country),
-            layerId = ~ID,
-            color = "grey",
-            weight = 1,
-            fillColor = ~ qpal2(mean_temp),
-            fillOpacity = 1,
-            options = pathOptions(pane = "markersPane")
-          )
+        if (nrow(selected_station_prev) > 0) {
+          leafletProxy("station_map", data = selected_station_prev) %>%
+            removeMarker(layerId = previous_id) %>%
+            addCircleMarkers(
+              lng = ~LONGITUDE, lat = ~LATITUDE,
+              radius = 5,
+              label = ~ generateLabel(NAME, ID, STNELEV, first_year, last_year, mean_value, input$year_range, Country, value_label_prefix, units),
+              layerId = ~ID,
+              color = "grey",
+              weight = 1,
+              fillColor = ~ qpal_fill(mean_value),
+              fillOpacity = 1,
+              options = pathOptions(pane = "markersPane")
+            )
+        }
       }
 
       previous_station_id(selected_id)
 
-      leafletProxy("station_map", data = selected_station) %>%
-        addCircleMarkers(
-          lng = ~LONGITUDE, lat = ~LATITUDE,
-          radius = 10,
-          layerId = ~ID,
-          color = "grey",
-          label = ~ generateLabel(NAME, ID, STNELEV, first_year, last_year, mean_temp, input$year_range, Country),
-          weight = 1,
-          fillColor = ~ qpal2(selected_station$mean_temp),
-          fillOpacity = 1,
-          options = pathOptions(pane = "markersPane")
-        )
+      if (nrow(selected_station) > 0) {
+        leafletProxy("station_map", data = selected_station) %>%
+          addCircleMarkers(
+            lng = ~LONGITUDE, lat = ~LATITUDE,
+            radius = 10,
+            layerId = ~ID,
+            color = "grey",
+            label = ~ generateLabel(NAME, ID, STNELEV, first_year, last_year, mean_value, input$year_range, Country, value_label_prefix, units),
+            weight = 1,
+            fillColor = ~ qpal_fill(selected_station$mean_value),
+            fillOpacity = 1,
+            options = pathOptions(pane = "markersPane")
+          )
+      }
     }
   })
 
 
+  # Reactive expression to retrieve time series data for the selected station and year/month inputs
   # Reactive expression to retrieve time series data for the selected station and year/month inputs
   time_series_data <- reactive({
     req(input$station_map_marker_click$id) # Ensure a station is clicked
 
     station_id <- input$station_map_marker_click$id
     month <- input$month
+    dataset <- if (input$parameter == "Temperature") tavg_dataset else prec_dataset
 
     # Filter the dataset based on selected station, month, and year range
     time_series_data <-
-      tavg_dataset %>%
+      dataset %>%
       filter(
         VALUE >= -90,
         YEAR >= input$year_range[1],
@@ -185,8 +275,11 @@ function(input, output, session) {
 
     station_id <- selected_station_id()
     month <- input$month
+    param <- input$parameter
+    y_label <- if (param == "Temperature") "Temperature (°C)" else "Precipitation (mm)"
+    title <- if (param == "Temperature") "Daily Mean Temperature" else "Total Precipitation"
 
-    render_time_series_plot(data, station_id, month)
+    render_time_series_plot(data, station_id, month, y_label, title)
   })
 
   # Observe to handle click events on the map markers and update plot accordingly
@@ -206,8 +299,11 @@ function(input, output, session) {
       req(nrow(data) > 0) # Ensure there is data to plot
 
       month <- input$month
+      param <- input$parameter
+      y_label <- if (param == "Temperature") "Temperature (°C)" else "Precipitation (mm)"
+      title <- if (param == "Temperature") "Daily Mean Temperature" else "Total Precipitation"
 
-      render_time_series_plot(data, station_id, month)
+      render_time_series_plot(data, station_id, month, y_label, title)
     })
   })
 
@@ -217,13 +313,16 @@ function(input, output, session) {
 
     station_id <- selected_station_id()
     month <- input$month
+    param <- input$parameter
+    y_label <- if (param == "Temperature") "Temperature (°C)" else "Precipitation (mm)"
+    title <- if (param == "Temperature") "Daily Mean Temperature" else "Total Precipitation"
 
     # Update the time series plot when month or year inputs change
     output$time_series_plot <- renderPlotly({
       data <- time_series_data() # Get the filtered time series data
       req(nrow(data) > 0) # Ensure there is data to plot
 
-      render_time_series_plot(data, station_id, month)
+      render_time_series_plot(data, station_id, month, y_label, title)
     })
   })
 
@@ -276,7 +375,8 @@ function(input, output, session) {
       # Create a dynamic filename based on station ID and month
       station_id <- selected_station_id()
       month <- input$month
-      paste0(tavg_meta$NAME[tavg_meta$ID == station_id], "_", station_id, "_", month, ".csv")
+      info <- if (input$parameter %in% c("Temperature", "Air Temperature")) tavg_meta else prec_meta
+      paste0(info$NAME[info$ID == station_id], "_", station_id, "_", month, ".csv")
     },
     content = function(file) {
       # Get the time series data for the clicked station
