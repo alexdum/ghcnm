@@ -110,7 +110,7 @@ station_summary = long_format_data.groupby('ID')['YEAR'].agg(first_year='min', l
 print(station_summary)
 
 
-station_summary.to_csv("www/data/tabs/tavg_vaialability.csv", index=False)
+station_summary.to_csv("www/data/tabs/tavg_availability.csv", index=False)
 
 
 ### read text  file 

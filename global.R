@@ -15,7 +15,7 @@ source("utils/generateLabel.R", local = T)
 
 # Read the metadata and availability data
 tavg_meta <- read.csv("www/data/tabs/tavg_meta.csv")
-tavg_avail <- read.csv("www/data/tabs/tavg_vaialability.csv")
+tavg_avail <- read.csv("www/data/tabs/tavg_availability.csv")
 
 # Merge the metadata and availability data on 'ID'
 stations_data <- merge(tavg_meta, tavg_avail, by = "ID")

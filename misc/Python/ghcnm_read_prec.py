@@ -125,7 +125,8 @@ for i, file in enumerate(csv_files):
     # 4. Skip this file if any 'precip_mm' value is greater than 5000
     if (df['precip_mm'] > 2000).any():
         #continue
-        sys.exit(1)
+        print(f"Skipping {file} due to extreme precipitation value (> 2000mm)")
+        continue
 
     # 5. Append cleaned and filtered dataframe
     dataframes.append(df)
@@ -137,7 +138,7 @@ combined_df.to_parquet('www/data/tabs/prec_long.parquet', engine='pyarrow', inde
     
 
 
-!rm -rf misc/data/*
+
 
 combined_df.describe()
 
