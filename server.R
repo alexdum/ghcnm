@@ -307,6 +307,125 @@ function(input, output, session) {
     })
   })
 
+  # --- URL Parameter Parsing ---
+  url_initialized <- reactiveVal(FALSE)
+
+  parse_url_params <- function(query) {
+    params <- list()
+    if (length(query) == 0 || query == "") {
+      return(params)
+    }
+    # Parse query string
+    q_str <- sub("^\\?", "", query)
+    pairs <- strsplit(q_str, "&")[[1]]
+    for (pair in pairs) {
+      parts <- strsplit(pair, "=")[[1]]
+      if (length(parts) == 2) {
+        key <- parts[1]
+        val <- URLdecode(parts[2])
+        params[[key]] <- val
+      }
+    }
+    params
+  }
+
+  # Observer: Apply URL params on app startup
+  observe({
+    req(!url_initialized())
+    query <- session$clientData$url_search
+    params <- parse_url_params(query)
+
+    if (length(params) > 0) {
+      # 1. Parameter
+      if (!is.null(params$parameter)) {
+        updateSelectInput(session, "parameter", selected = params$parameter)
+      }
+
+      # 2. Month
+      if (!is.null(params$month)) {
+        updateSelectInput(session, "month", selected = params$month)
+      }
+
+      # 3. Year Range
+      if (!is.null(params$start) && !is.null(params$end)) {
+        updateSliderInput(session, "year_range", value = c(as.numeric(params$start), as.numeric(params$end)))
+      }
+
+      # 4. Station Selection
+      if (!is.null(params$station)) {
+        station_ref <- params$station
+        shinyjs::delay(1000, {
+          stations_info <- if (input$parameter %in% c("Temperature", "Air Temperature")) stations_data else prec_stations_data
+          match <- stations_info %>% filter(ID == station_ref | NAME == station_ref)
+          if (nrow(match) > 0) {
+            selected_station_id(match$ID[1])
+          }
+        })
+      }
+    }
+    url_initialized(TRUE)
+  })
+
+  # Helper: Broadcast current state to parent page
+  broadcast_state <- function() {
+    sid <- selected_station_id()
+    st_meta <- NULL
+    if (!is.null(sid)) {
+      stations_info <- if (input$parameter %in% c("Temperature", "Air Temperature")) stations_data else prec_stations_data
+      st_meta <- stations_info %>%
+        filter(ID == sid) %>%
+        head(1)
+    }
+
+    station_id <- if (!is.null(st_meta) && nrow(st_meta) > 0) as.character(st_meta$ID) else NULL
+    station_name <- if (!is.null(st_meta) && nrow(st_meta) > 0) as.character(st_meta$NAME) else NULL
+    country <- if (!is.null(st_meta) && nrow(st_meta) > 0) as.character(st_meta$Country) else NULL
+
+    session$sendCustomMessage("updateParentURL", list(
+      station = station_id,
+      stationName = station_name,
+      country = country,
+      parameter = input$parameter,
+      month = input$month,
+      yearStart = input$year_range[1],
+      yearEnd = input$year_range[2]
+    ))
+  }
+
+  # Observer to broadcast state on any relevant change
+  observe({
+    # Depend on all state variables that should trigger a broadcast
+    sid <- selected_station_id()
+    param <- input$parameter
+    month <- input$month
+    year_range <- input$year_range
+
+    req(url_initialized())
+
+    # Broadcast the current state
+    st_meta <- NULL
+    if (!is.null(sid)) {
+      stations_info <- if (param %in% c("Temperature", "Air Temperature")) stations_data else prec_stations_data
+      st_meta <- stations_info %>%
+        filter(ID == sid) %>%
+        head(1)
+    }
+
+    station_id <- if (!is.null(st_meta) && nrow(st_meta) > 0) as.character(st_meta$ID) else NULL
+    station_name <- if (!is.null(st_meta) && nrow(st_meta) > 0) as.character(st_meta$NAME) else NULL
+    country <- if (!is.null(st_meta) && nrow(st_meta) > 0) as.character(st_meta$Country) else NULL
+
+    session$sendCustomMessage("updateParentURL", list(
+      station = station_id,
+      stationName = station_name,
+      country = country,
+      parameter = param,
+      month = month,
+      yearStart = year_range[1],
+      yearEnd = year_range[2]
+    ))
+  })
+
   # Reactive observer to update the plot when month or year inputs change
   observe({
     req(input$month, input$year_range) # Ensure month and year range inputs are provided

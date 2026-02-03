@@ -4,10 +4,12 @@ ui <- page_navbar(
   title = "GHCNm Explorer",
   navbar_options = navbar_options(collapsible = TRUE),
   header = tags$head(
+    shinyjs::useShinyjs(),
     tags$link(rel = "canonical", href = "https://climate-insights.netlify.app/ghcnm"),
     tags$meta(name = "robots", content = "noindex,indexifembedded"),
     tags$link(rel = "stylesheet", type = "text/css", href = "custom.css"), # Link to custom CSS
-    tags$script(src = "fullscreen.js")
+    tags$script(src = "fullscreen.js"),
+    tags$script(src = "app.js")
   ),
   fillable_mobile = T,
   nav_panel(
