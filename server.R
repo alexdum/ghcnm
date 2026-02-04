@@ -55,7 +55,7 @@ function(input, output, session) {
 
   # Render the Leaflet map
   output$station_map <- renderLeaflet({
-    leaflet() %>%
+    leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
       addTiles(group = "OpenStreetMap") %>%
       addProviderTiles(providers$CartoDB.PositronNoLabels, group = "CartoDB Positron") %>%
       addProviderTiles(providers$Esri.WorldTopoMap, group = "Esri World Topo Map") %>%
