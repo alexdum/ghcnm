@@ -60,8 +60,7 @@ ui <- page_navbar(
               "OpenStreetMap" = "osm",
               "OpenStreetMap Gray" = "osm_gray",
               "Esri World Topo Map" = "esri_topo",
-              "Esri World Imagery" = "esri_imagery",
-              "Mapbox Satellite" = "mapbox_satellite"
+              "Esri World Imagery" = "esri_imagery"
             ),
             selected = "carto_positron"
           ),

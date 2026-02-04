@@ -90,13 +90,12 @@ function(input, output, session) {
       current_raster_layers(character(0))
     }
 
-    if (input$basemap %in% c("carto_positron", "carto_voyager", "esri_imagery", "mapbox_satellite")) {
+    if (input$basemap %in% c("carto_positron", "carto_voyager", "esri_imagery")) {
       # VECTOR STYLES
       style_url <- switch(input$basemap,
         "carto_positron" = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
         "carto_voyager" = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
-        "esri_imagery" = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json", # Voyager for labels
-        "mapbox_satellite" = paste0("https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12?access_token=", mapbox_token)
+        "esri_imagery" = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json" # Voyager for labels
       )
 
       proxy %>% set_style(style_url)
@@ -194,7 +193,7 @@ function(input, output, session) {
 
   # Toggle Labels (Vector only)
   observeEvent(input$show_labels, {
-    req(input$basemap %in% c("carto_positron", "carto_voyager", "mapbox_satellite", "esri_imagery"))
+    req(input$basemap %in% c("carto_positron", "carto_voyager", "esri_imagery"))
     visibility <- if (input$show_labels) "visible" else "none"
     label_layers <- c(
       "place_villages", "place_town", "place_country_2", "place_country_1",
