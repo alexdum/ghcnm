@@ -13,6 +13,50 @@ library(shinyjs)
 
 source("utils/render_time_series_plot.R", local = T)
 source("utils/generateLabel.R", local = T)
+library(mapgl)
+library(sf)
+
+# Mapbox Token (Placeholder - User must replace if using Mapbox styles)
+mapbox_token <- "pk.REPLACE_WITH_YOUR_TOKEN"
+
+# Define custom raster styles for OSM and Esri
+osm_style <- list(
+    version = 8,
+    sources = list(
+        osm = list(
+            type = "raster",
+            tiles = list("https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"),
+            tileSize = 256,
+            attribution = "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors"
+        )
+    ),
+    layers = list(
+        list(
+            id = "osm",
+            type = "raster",
+            source = "osm"
+        )
+    )
+)
+
+esri_style <- list(
+    version = 8,
+    sources = list(
+        esri = list(
+            type = "raster",
+            tiles = list("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"),
+            tileSize = 256,
+            attribution = "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
+        )
+    ),
+    layers = list(
+        list(
+            id = "esri",
+            type = "raster",
+            source = "esri"
+        )
+    )
+)
 
 # Read the metadata and availability data
 tavg_meta <- read.csv("www/data/tabs/tavg_meta.csv")

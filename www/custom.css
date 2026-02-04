@@ -15,3 +15,56 @@
   font-size: 14px !important;
   line-height: 1.2 !important;
 }
+
+/* Collapsible Map Control Styling */
+.map-layer-control {
+  background-color: white;
+  border-radius: 4px;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+  padding: 5px;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  transition: width 0.3s ease, height 0.3s ease;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+
+.map-layer-control.expanded {
+  width: 200px;
+  height: auto;
+  padding: 10px;
+}
+
+.control-icon {
+  width: 26px;
+  height: 26px;
+  text-align: center;
+  margin-bottom: 5px;
+  font-size: 18px;
+  color: #333;
+  flex-shrink: 0;
+}
+
+.control-content {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  margin-top: 5px;
+  white-space: nowrap;
+  /* Prevent wrapping during transition */
+}
+
+.map-layer-control.expanded .control-content {
+  opacity: 1;
+  white-space: normal;
+}
+
+.map-layer-control.expanded .control-icon {
+  display: none !important;
+}
+
+.map-layer-control .control-content label {
+  font-size: 85%;
+  /* Reduce text size by 15% */
+}

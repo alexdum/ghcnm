@@ -22,3 +22,18 @@ Shiny.addCustomMessageHandler('updateParentURL', function (message) {
         }, '*');
     }
 });
+
+$(document).ready(function () {
+    // Layer Control Interactions (using delegation for robustness)
+    $(document).on('mouseenter', '.map-layer-control', function () {
+        $(this).addClass('expanded');
+    });
+
+    $(document).on('mouseleave', '.map-layer-control', function () {
+        $(this).removeClass('expanded');
+    });
+
+    $(document).on('change', '.map-layer-control input[type="radio"]', function () {
+        $('.map-layer-control').removeClass('expanded');
+    });
+});

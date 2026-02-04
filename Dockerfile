@@ -2,6 +2,14 @@ FROM rocker/shiny-verse:latest
 
 WORKDIR /code
 
+# Install system dependencies for sf/mapgl
+RUN apt-get update && apt-get install -y \
+    libudunits2-dev \
+    libgdal-dev \
+    libgeos-dev \
+    libproj-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install stable packages from CRAN
 RUN install2.r --error \
     ggExtra \
@@ -13,7 +21,9 @@ RUN install2.r --error \
     markdown \
     plotly \
     orca \
-    bsicons
+    bsicons \
+    mapgl \
+    sf
 
 # Install development packages from GitHub
 RUN installGithub.r \

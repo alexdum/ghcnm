@@ -7,9 +7,9 @@ ui <- page_navbar(
     shinyjs::useShinyjs(),
     tags$link(rel = "canonical", href = "https://climate-insights.netlify.app/ghcnm"),
     tags$meta(name = "robots", content = "noindex,indexifembedded"),
-    tags$link(rel = "stylesheet", type = "text/css", href = "custom.css"), # Link to custom CSS
+    tags$link(rel = "stylesheet", type = "text/css", href = "custom.css?v=1.0"), # Link to custom CSS
     tags$script(src = "fullscreen.js"),
-    tags$script(src = "app.js")
+    tags$script(src = "app.js?v=1.0")
   ),
   fillable_mobile = T,
   nav_panel(
@@ -40,7 +40,53 @@ ui <- page_navbar(
     #   )
 
 
-    leafletOutput("station_map", width = "100%", height = "100%"),
+    div(
+      style = "position: relative; height: 100%; width: 100%;",
+      maplibreOutput("station_map", width = "100%", height = "100%"),
+      # Layer Control (Below Navigation Control)
+      absolutePanel(
+        top = 160, right = 10, left = "auto",
+        class = "map-layer-control",
+        style = "z-index: 1000;",
+        div(class = "control-icon", icon("layer-group")),
+        div(
+          class = "control-content",
+          radioButtons(
+            inputId = "basemap",
+            label = "Basemap",
+            choices = c(
+              "Carto Positron (Light)" = "carto_positron",
+              "Carto Voyager" = "carto_voyager",
+              "OpenStreetMap" = "osm",
+              "OpenStreetMap Gray" = "osm_gray",
+              "Esri World Topo Map" = "esri_topo",
+              "Esri World Imagery" = "esri_imagery",
+              "Mapbox Satellite" = "mapbox_satellite"
+            ),
+            selected = "carto_positron"
+          ),
+          hr(style = "margin: 8px 0;"),
+          checkboxInput(
+            inputId = "show_labels",
+            label = "Show Labels",
+            value = TRUE
+          )
+        )
+      ),
+      # Home Zoom Button (Below Navigation and above Layer Control)
+      absolutePanel(
+        top = 110, right = 10, left = "auto",
+        style = "z-index: 1000;",
+        actionButton(
+          inputId = "home_zoom",
+          label = NULL,
+          icon = icon("house"),
+          style = "background-color: white; border: none; border-radius: 4px; box-shadow: 0 0 5px rgba(0,0,0,0.3); width: 36px; height: 36px; padding: 0; color: #333;"
+        )
+      ),
+      # Map Legend
+      uiOutput("map_legend")
+    ),
     absolutePanel(
       top = 80, left = 30, right = "auto", bottom = "auto",
       width = 150, height = "auto",

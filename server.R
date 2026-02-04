@@ -53,201 +53,294 @@ function(input, output, session) {
   selected_station_id <- reactiveVal(NULL)
   previous_station_id <- reactiveVal(NULL)
 
-  # Render the Leaflet map
-  output$station_map <- renderLeaflet({
-    leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
-      addTiles(group = "OpenStreetMap") %>%
-      addProviderTiles(providers$CartoDB.PositronNoLabels, group = "CartoDB Positron") %>%
-      addProviderTiles(providers$Esri.WorldTopoMap, group = "Esri World Topo Map") %>%
-      addProviderTiles(providers$Esri.WorldImagery, group = "Esri World Imagery") %>%
-      addMapPane("markersPane", zIndex = 400) %>%
-      addMapPane("labelsPane", zIndex = 500) %>%
-      addProviderTiles(providers$CartoDB.PositronOnlyLabels, group = "CartoDB Labels", options = providerTileOptions(opacity = 0.8, pane = "labelsPane")) %>%
-      setView(lng = initial_lng, lat = initial_lat, zoom = initial_zoom) %>%
-      addControl("<div></div>", position = "topright") %>%
-      htmlwidgets::onRender("function(el, x) { var map = this; map.zoomControl.setPosition('topright'); }") %>%
-      addLayersControl(
-        baseGroups = c("CartoDB Voyager", "Esri World Imagery", "Esri World Topo Map", "OpenStreetMap"),
-        overlayGroups = c("CartoDB Labels"),
-        options = layersControlOptions(collapsed = TRUE)
-      ) %>%
-      addEasyButton(
-        easyButton(
-          icon = "fa-home",
-          title = "Reset View",
-          onClick = JS(sprintf(
-            "function(btn, map){ map.setView([%f, %f], %d); }",
-            initial_lat, initial_lng, initial_zoom
-          )),
-          position = "topright"
-        )
+  # Reactive values for map state
+  style_change_trigger <- reactiveVal(0) # Triggers redraw after style change
+  stations_before_id <- reactiveVal(NULL) # Layer ID to insert stations before
+  current_raster_layers <- reactiveVal(character(0)) # Track raster layers
+
+  # Render the MapLibre map
+  output$station_map <- renderMaplibre({
+    print("Initializing MapLibre...")
+    maplibre(
+      style = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+      center = c(initial_lng, initial_lat),
+      zoom = initial_zoom
+    ) %>%
+      add_navigation_control(show_compass = FALSE, visualize_pitch = FALSE, position = "top-right")
+  })
+
+  # Initialize map bounds / Home Zoom
+  observeEvent(input$home_zoom, {
+    maplibre_proxy("station_map") %>%
+      fly_to(center = c(initial_lng, initial_lat), zoom = initial_zoom)
+  })
+
+  # Basemap Switching Logic (Sandwich Method)
+  observeEvent(input$basemap, {
+    req(input$basemap)
+    print(paste("Basemap Change:", input$basemap))
+    proxy <- maplibre_proxy("station_map")
+
+    # Remove old raster layers
+    old_layers <- isolate(current_raster_layers())
+    if (length(old_layers) > 0) {
+      for (layer_id in old_layers) {
+        proxy %>% clear_layer(layer_id)
+      }
+      current_raster_layers(character(0))
+    }
+
+    if (input$basemap %in% c("carto_positron", "carto_voyager", "esri_imagery", "mapbox_satellite")) {
+      # VECTOR STYLES
+      style_url <- switch(input$basemap,
+        "carto_positron" = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+        "carto_voyager" = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
+        "esri_imagery" = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json", # Voyager for labels
+        "mapbox_satellite" = paste0("https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12?access_token=", mapbox_token)
       )
+
+      proxy %>% set_style(style_url)
+      stations_before_id("watername_ocean") # Insert stations below labels
+
+      # Esri Imagery Special Case (Raster beneath Vector Labels)
+      if (input$basemap == "esri_imagery") {
+        session <- shiny::getDefaultReactiveDomain()
+        selected_basemap <- input$basemap
+
+        later::later(function() {
+          shiny::withReactiveDomain(session, {
+            current_basemap <- isolate(input$basemap)
+            if (current_basemap != selected_basemap) {
+              return()
+            }
+
+            unique_suffix <- as.numeric(Sys.time()) * 1000
+            source_id <- paste0("esri_source_", unique_suffix)
+            layer_id <- paste0("esri_layer_", unique_suffix)
+            esri_url <- "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+
+            maplibre_proxy("station_map") %>%
+              add_raster_source(id = source_id, tiles = c(esri_url), tileSize = 256) %>%
+              add_layer(
+                id = layer_id,
+                type = "raster",
+                source = source_id,
+                paint = list("raster-opacity" = 1),
+                before_id = "watername_ocean"
+              )
+            current_raster_layers(c(layer_id))
+            style_change_trigger(isolate(style_change_trigger()) + 1)
+          })
+        }, delay = 0.5)
+      } else {
+        style_change_trigger(isolate(style_change_trigger()) + 1)
+      }
+    } else {
+      # RASTER STYLES (OSM, Esri Topo)
+      tile_url <- if (input$basemap %in% c("osm", "osm_gray")) {
+        "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+      } else {
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"
+      }
+
+      attribution <- if (input$basemap %in% c("osm", "osm_gray")) {
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      } else {
+        "Tiles &copy; Esri"
+      }
+
+      paint_props <- list("raster-opacity" = 1)
+      if (input$basemap == "osm_gray") {
+        paint_props[["raster-saturation"]] <- -0.9
+        paint_props[["raster-contrast"]] <- 0.3
+      }
+
+      # Blank style
+      blank_style <- list(version = 8, sources = list(), layers = list())
+      json_blank <- jsonlite::toJSON(blank_style, auto_unbox = TRUE)
+      blank_uri <- paste0("data:application/json,", URLencode(as.character(json_blank), reserved = TRUE))
+
+      proxy %>% set_style(blank_uri)
+
+      session <- shiny::getDefaultReactiveDomain()
+      selected_basemap <- input$basemap
+
+      later::later(function() {
+        shiny::withReactiveDomain(session, {
+          if (isolate(input$basemap) != selected_basemap) {
+            return()
+          }
+
+          unique_suffix <- as.numeric(Sys.time()) * 1000
+          source_id <- paste0("raster_source_", unique_suffix)
+          layer_id <- paste0("raster_layer_", unique_suffix)
+
+          maplibre_proxy("station_map") %>%
+            add_raster_source(id = source_id, tiles = c(tile_url), tileSize = 256, attribution = attribution) %>%
+            add_layer(
+              id = layer_id,
+              type = "raster",
+              source = source_id,
+              paint = paint_props
+            )
+
+          stations_before_id(NULL) # On top of raster
+          current_raster_layers(c(layer_id))
+          style_change_trigger(isolate(style_change_trigger()) + 1)
+        })
+      }, delay = 0.5)
+    }
+  })
+
+  # Toggle Labels (Vector only)
+  observeEvent(input$show_labels, {
+    req(input$basemap %in% c("carto_positron", "carto_voyager", "mapbox_satellite", "esri_imagery"))
+    visibility <- if (input$show_labels) "visible" else "none"
+    label_layers <- c(
+      "place_villages", "place_town", "place_country_2", "place_country_1",
+      "place_state", "place_continent", "place_city_r6", "place_city_r5",
+      "place_city_dot_r7", "place_city_dot_r4", "place_city_dot_r2", "place_city_dot_z7",
+      "place_capital_dot_z7", "place_capital", "roadname_minor", "roadname_sec",
+      "roadname_pri", "roadname_major", "motorway_name", "watername_ocean",
+      "watername_sea", "watername_lake", "watername_lake_line", "poi_stadium",
+      "poi_park", "poi_zoo", "airport_label", "country-label", "state-label",
+      "settlement-major-label", "settlement-minor-label", "settlement-subdivision-label",
+      "road-label", "waterway-label", "natural-point-label", "poi-label", "airport-label"
+    )
+    proxy <- maplibre_proxy("station_map")
+    for (layer_id in label_layers) {
+      tryCatch(
+        {
+          proxy %>% set_layout_property(layer_id, "visibility", visibility)
+        },
+        error = function(e) {}
+      )
+    }
   })
 
   # Initial rendering of all markers
   # Initial rendering of all markers
-  observeEvent(filtered_stations(), {
+  # Render Stations Layer (MapLibre)
+  # Flag to track if map is initialized
+  map_initialized <- reactiveVal(FALSE)
+
+  # One-time observer to detect map load
+  observe({
+    req(input$station_map_zoom)
+    if (!map_initialized()) {
+      map_initialized(TRUE)
+    }
+  })
+
+  # Render Stations Layer (MapLibre)
+  # Render Stations Layer (MapLibre) - DATA UPDATE ONLY
+  observe({
+    req(map_initialized()) # Wait for map to be ready
+    req(filtered_stations())
+    style_change_trigger() # Re-add layer if style changes
+
     data <- filtered_stations()
     param <- input$parameter
+    # Note: We do NOT depend on selected_station_id() here to avoid full redraws on click
 
-    # Define color palette and units based on parameter
+    # Define palettes and units
     if (param %in% c("Temperature", "Air Temperature")) {
       palette_domain <- data$mean_value
-      # Detailed bins centered on 0, extended to cover extremes (-90 to 60)
-      bins <- c(-90, -40, -30, -20, -15, -12.5, -10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30, 35, 40, 60)
-
-      # Custom palette:
-      # 10 negative intervals: -90..-40, -40..-30, ... -2.5..0
-      # 15 positive intervals: 0..2.5, ... 40..60
-
+      bins <- c(-Inf, -40, -30, -20, -15, -12.5, -10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30, 35, 40, Inf)
       blues <- colorRampPalette(c("#053061", "#4393c3", "#d1e5f0"))(10)
       reds <- colorRampPalette(c("#fff7bc", "#fdae61", "#d73027", "#67001f"))(15)
-      palette_name <- c(blues, reds)
-
-      reverse <- FALSE # Custom palette is already ordered Blue -> Red
+      palette_colors <- c(blues, reds)
       units <- "°C"
-      value_label_prefix <- "Mean Temp:"
+      prefix <- "Mean Temp:"
     } else {
       palette_domain <- data$mean_value
-      # Use interpolated palette because we have > 9 bins
-      palette_name <- colorRampPalette(RColorBrewer::brewer.pal(9, "YlGnBu"))(12)
-      reverse <- FALSE # Darker for more rain
+      palette_colors <- colorRampPalette(RColorBrewer::brewer.pal(9, "YlGnBu"))(12)
       units <- "mm"
-      value_label_prefix <- "Mean Precip:"
-      # Use detailed bins for precipitation to see low values better, extended to Inf
+      prefix <- "Mean Precip:"
       bins <- c(0, 10, 25, 50, 75, 100, 150, 200, 300, 500, 1000, 2000, Inf)
     }
-    # Creating palettes
-    # For legend (we want standard direction usually, but let's match the map logic)
-    # Actually, leaflet legend usually goes low -> high bottom -> top.
-    # We construct qpal for the specific domain and direction
 
-    qpal <- colorBin(palette_name, domain = palette_domain, bins = bins, na.color = "transparent", reverse = FALSE)
-    # qpal2 is used for fillColor, often we want to reverse RdYlBu so red is high.
-    # For independent control, let's explicitly set reverse map
-    qpal_fill <- colorBin(palette_name, domain = palette_domain, bins = bins, na.color = "transparent", reverse = reverse)
+    # Color Function
+    pal_fun <- colorBin(palette_colors, domain = palette_domain, bins = bins, na.color = "transparent")
 
-
-    # Generate custom labels for legend
-    n_bins <- length(bins)
-    labels <- character(n_bins - 1)
-    for (i in 1:(n_bins - 1)) {
-      if (is.infinite(bins[i + 1])) {
-        labels[i] <- paste0("> ", bins[i])
-      } else {
-        # Optional: format numbers to remove decimals if integers?
-        # For now simple paste is fine, R handles printing.
-        labels[i] <- paste0(bins[i], " - ", bins[i + 1])
-      }
-    }
-
-    # Reverse for legend (High values at top)
-    legend_colors <- rev(palette_name)
-    legend_labels <- rev(labels)
-
-    leafletProxy("station_map", data = data) %>%
-      clearMarkers() %>%
-      addCircleMarkers(
-        lng = ~LONGITUDE, lat = ~LATITUDE,
-        radius = 5,
-        layerId = ~ID,
-        label = ~ generateLabel(NAME, ID, STNELEV, first_year, last_year, mean_value, input$year_range, Country, value_label_prefix, units),
-        color = "grey",
-        weight = 1,
-        fillColor = ~ qpal_fill(mean_value),
-        fillOpacity = 1,
-        options = pathOptions(pane = "markersPane")
+    # Prepare Data for MapLibre
+    map_data <- data %>%
+      mutate(
+        circle_color = pal_fun(mean_value),
+        # Default (unselected/base) styles
+        # We rely on paint property updates for selection highlighting
+        # Generate Label Content (Tooltip)
+        popup_content = as.character(mapply(function(n, i, e, f, l, m, yr, c, p, u) {
+          generateLabel(n, i, e, f, l, m, yr, c, p, u)
+        }, NAME, ID, STNELEV, first_year, last_year, mean_value, list(input$year_range), Country, prefix, units))
       ) %>%
-      clearControls() %>%
-      addLegend(
-        position = "bottomleft",
-        colors = legend_colors,
-        labels = legend_labels,
-        title = htmltools::HTML(paste0("<div style='text-align: center;'>", units, "</div>")),
-        opacity = 1
+      st_as_sf(coords = c("LONGITUDE", "LATITUDE"), crs = 4326)
+
+    # Add Layer with base styles
+    maplibre_proxy("station_map") %>%
+      clear_layer("stations") %>%
+      add_circle_layer(
+        id = "stations",
+        source = map_data,
+        circle_color = get_column("circle_color"),
+        circle_radius = 5,
+        circle_stroke_color = get_column("circle_color"),
+        circle_stroke_width = 2,
+        circle_opacity = 0.7,
+        circle_stroke_opacity = 1,
+        tooltip = get_column("popup_content"),
+        before_id = stations_before_id()
       )
+
+    # Re-apply current selection style immediately after rendering
+    # (Use isolate to avoid reactivity here, though this observer is triggered by data change)
+    cur_sel <- isolate(selected_station_id())
+    update_selection_style(cur_sel)
   })
 
-  # Update selected marker
-  observeEvent(list(selected_station_id(), input$month, input$year_range, input$parameter), {
-    previous_id <- previous_station_id()
-    if (!is.null(selected_station_id())) {
-      data <- filtered_stations()
-      selected_id <- selected_station_id()
-      param <- input$parameter
+  # Helper to update selection styles efficiently
+  update_selection_style <- function(id) {
+    if (is.null(id)) {
+      # Reset to base styles
+      maplibre_proxy("station_map") %>%
+        set_paint_property("stations", "circle-radius", 5) %>%
+        set_paint_property("stations", "circle-stroke-width", 2) %>%
+        # Reset stroke color to match circle color using data-driven property
+        set_paint_property("stations", "circle-stroke-color", list("get", "circle_color"))
+    } else {
+      # Apply highlight style using expressions
+      # Radius: 8 if selected, 5 otherwise
+      radius_expr <- list("case", list("==", list("get", "ID"), id), 8, 5)
 
-      # Define color palette and units based on parameter (Duplicate logic, ideally refactor into function)
-      # Define color palette and units based on parameter (Duplicate logic, ideally refactor into function)
-      if (param %in% c("Temperature", "Air Temperature")) {
-        palette_domain <- data$mean_value
-        # Detailed bins centered on 0 with 2.5 degree steps, extended range
-        bins <- c(-90, -40, -30, -20, -15, -12.5, -10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30, 35, 40, 60)
-        # Custom palette: 10 blues, 15 reds
-        blues <- colorRampPalette(c("#053061", "#4393c3", "#d1e5f0"))(10)
-        reds <- colorRampPalette(c("#fff7bc", "#fdae61", "#d73027", "#67001f"))(15)
-        palette_name <- c(blues, reds)
+      # Stroke Width: 3 if selected, 2 otherwise
+      width_expr <- list("case", list("==", list("get", "ID"), id), 3, 2)
 
-        reverse <- FALSE
-        units <- "°C"
-        value_label_prefix <- "Mean Temp:"
-      } else {
-        palette_domain <- data$mean_value
-        # Use interpolated palette
-        palette_name <- colorRampPalette(RColorBrewer::brewer.pal(9, "YlGnBu"))(12)
-        reverse <- FALSE
-        units <- "mm"
-        value_label_prefix <- "Mean Precip:"
-        bins <- c(0, 10, 25, 50, 75, 100, 150, 200, 300, 500, 1000, 2000, Inf)
-      }
+      # Stroke Color: Red if selected, else use circle_color
+      color_expr <- list("case", list("==", list("get", "ID"), id), "#FF0000", list("get", "circle_color"))
 
-      selected_station <- data[data$ID == selected_id, ]
-      qpal_fill <- colorBin(palette_name, domain = palette_domain, bins = bins, na.color = "transparent", reverse = reverse)
-
-      if (!is.null(previous_id) && previous_id != selected_id) {
-        selected_station_prev <- data[data$ID == previous_id, ]
-        if (nrow(selected_station_prev) > 0) {
-          leafletProxy("station_map", data = selected_station_prev) %>%
-            removeMarker(layerId = previous_id) %>%
-            addCircleMarkers(
-              lng = ~LONGITUDE, lat = ~LATITUDE,
-              radius = 5,
-              label = ~ generateLabel(NAME, ID, STNELEV, first_year, last_year, mean_value, input$year_range, Country, value_label_prefix, units),
-              layerId = ~ID,
-              color = "grey",
-              weight = 1,
-              fillColor = ~ qpal_fill(mean_value),
-              fillOpacity = 1,
-              options = pathOptions(pane = "markersPane")
-            )
-        }
-      }
-
-      previous_station_id(selected_id)
-
-      if (nrow(selected_station) > 0) {
-        leafletProxy("station_map", data = selected_station) %>%
-          addCircleMarkers(
-            lng = ~LONGITUDE, lat = ~LATITUDE,
-            radius = 10,
-            layerId = ~ID,
-            color = "grey",
-            label = ~ generateLabel(NAME, ID, STNELEV, first_year, last_year, mean_value, input$year_range, Country, value_label_prefix, units),
-            weight = 1,
-            fillColor = ~ qpal_fill(selected_station$mean_value),
-            fillOpacity = 1,
-            options = pathOptions(pane = "markersPane")
-          )
-      }
+      maplibre_proxy("station_map") %>%
+        set_paint_property("stations", "circle-radius", radius_expr) %>%
+        set_paint_property("stations", "circle-stroke-width", width_expr) %>%
+        set_paint_property("stations", "circle-stroke-color", color_expr)
     }
-  })
+  }
+
+  # Selection Observer - VISUAL UPDATE ONLY
+  observeEvent(selected_station_id(),
+    {
+      req(map_initialized())
+      update_selection_style(selected_station_id())
+    },
+    ignoreInit = TRUE
+  )
 
 
   # Reactive expression to retrieve time series data for the selected station and year/month inputs
   # Reactive expression to retrieve time series data for the selected station and year/month inputs
   time_series_data <- reactive({
-    req(input$station_map_marker_click$id) # Ensure a station is clicked
+    req(selected_station_id()) # Ensure a station is clicked
 
-    station_id <- input$station_map_marker_click$id
+    station_id <- selected_station_id()
     month <- input$month
     dataset <- if (input$parameter == "Temperature") tavg_dataset else prec_dataset
 
@@ -283,28 +376,32 @@ function(input, output, session) {
   })
 
   # Observe to handle click events on the map markers and update plot accordingly
-  observeEvent(input$station_map_marker_click, {
-    selected_station_id(input$station_map_marker_click$id)
-  })
+  # Observe to handle click events on the map markers and update plot accordingly
+  observeEvent(input$station_map_feature_click, {
+    clicked <- input$station_map_feature_click
 
+    # Check layer ID (support both layer_id and layer)
+    is_station_layer <- FALSE
+    if (!is.null(clicked$layer_id) && clicked$layer_id == "stations") is_station_layer <- TRUE
+    if (!is.null(clicked$layer) && clicked$layer == "stations") is_station_layer <- TRUE
 
-  # Observer to handle click events on the map markers and update plot accordingly
-  observeEvent(input$station_map_marker_click, {
-    # Trigger the time series plot update based on the clicked station
-    station_id <- selected_station_id()
+    if (!is.null(clicked) && is_station_layer) {
+      # Handle potential case sensitivity or property name differences
+      props <- clicked$properties
+      # Try 'ID' (original) then 'id' (potentially lowercased by JS/sf)
+      click_id <- if (!is.null(props$ID)) props$ID else props$id
 
-    # Update the time series plot when a station is clicked
-    output$time_series_plot <- renderPlotly({
-      data <- time_series_data() # Get the filtered time series data
-      req(nrow(data) > 0) # Ensure there is data to plot
+      print(paste("Selected ID:", click_id))
+      if (!is.null(click_id)) {
+        selected_station_id(click_id)
 
-      month <- input$month
-      param <- input$parameter
-      y_label <- if (param == "Temperature") "Temperature (°C)" else "Precipitation (mm)"
-      title <- if (param == "Temperature") "Daily Mean Temperature" else "Total Precipitation"
-
-      render_time_series_plot(data, station_id, month, y_label, title)
-    })
+        # Center map on clicked station, preserving current zoom
+        if (!is.null(clicked$lng) && !is.null(clicked$lat)) {
+          maplibre_proxy("station_map") %>%
+            fly_to(center = c(clicked$lng, clicked$lat), zoom = input$station_map_zoom)
+        }
+      }
+    }
   })
 
   # --- URL Parameter Parsing ---
@@ -487,6 +584,82 @@ function(input, output, session) {
     }
   })
 
+
+  # Render Map Legend
+  output$map_legend <- renderUI({
+    param <- input$parameter
+
+    # Define legend properties matching the map logic
+    if (param %in% c("Temperature", "Air Temperature")) {
+      bins <- c(-Inf, -40, -30, -20, -15, -12.5, -10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30, 35, 40, Inf)
+      blues <- colorRampPalette(c("#053061", "#4393c3", "#d1e5f0"))(10)
+      reds <- colorRampPalette(c("#fff7bc", "#fdae61", "#d73027", "#67001f"))(15)
+      colors <- c(blues, reds)
+      units <- "°C"
+
+      # For temperature, we reverse the display so high values are at top
+      display_bins <- rev(bins)
+      display_colors <- rev(colors)
+    } else {
+      # Precip
+      colors <- colorRampPalette(RColorBrewer::brewer.pal(9, "YlGnBu"))(12)
+      units <- "mm"
+      bins <- c(0, 10, 25, 50, 75, 100, 150, 200, 300, 500, 1000, 2000, Inf)
+
+      display_bins <- rev(bins)
+      display_colors <- rev(colors)
+    }
+
+    # Generate HTML items
+    legend_items <- lapply(seq_along(display_colors), function(i) {
+      # Bins are effectively boundaries.
+      # With n colors, we have n+1 boundaries (if we include start/end), or we map n colors to n intervals.
+      # The bins array has length N+1 for N colors.
+
+      # display_bins has high values first.
+      # display_colors has high value colors first.
+
+      # Current interval: display_bins[i] (upper) to display_bins[i+1] (lower)
+      # Wait, bins c(a, b, c) -> intervals (a,b), (b,c). 2 intervals, 3 boundaries.
+      # length(colors) should be length(bins) - 1.
+
+      # Let's verify lengths.
+      # Temp: 10+15 = 25 colors. Bins: 26 values. Correct.
+      # Prec: 12 colors. Bins: 13 values. Correct.
+
+      val_high <- display_bins[i]
+      val_low <- display_bins[i + 1]
+      color <- display_colors[i]
+
+      label_text <- if (is.infinite(val_high)) {
+        paste0("> ", val_low)
+      } else if (is.infinite(val_low)) {
+        paste0("< ", val_high)
+      } else {
+        paste0(val_low, " – ", val_high)
+      }
+
+      tags$div(
+        style = "display: flex; align-items: center; margin-bottom: 0px;",
+        tags$span(
+          style = sprintf("background: %s; width: 18px; height: 18px; margin-right: 8px; display: inline-block; opacity: 0.9; border: 1px solid #ccc; border-bottom: none;", color)
+        ),
+        tags$span(
+          style = "font-size: 11px;",
+          label_text
+        )
+      )
+    })
+
+    absolutePanel(
+      bottom = 30, left = 20,
+      draggable = FALSE,
+      width = 130, # Fixed width for neatness
+      style = "background: white; padding: 10px; border-radius: 4px; box-shadow: 0 0 5px rgba(0,0,0,0.3); max-height: 80vh; overflow-y: auto;",
+      tags$h6(style = "margin-top: 0; margin-bottom: 8px; font-weight: bold; text-align: center;", units),
+      do.call(tags$div, legend_items)
+    )
+  })
 
   # Define the download handler for downloading the time series data
   output$download_data <- downloadHandler(
