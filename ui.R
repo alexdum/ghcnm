@@ -55,14 +55,11 @@ ui <- page_navbar(
             inputId = "basemap",
             label = "Basemap",
             choices = c(
-              "Carto Positron (Light)" = "carto_positron",
-              "Carto Voyager" = "carto_voyager",
-              "OpenStreetMap" = "osm",
-              "OpenStreetMap Gray" = "osm_gray",
-              "Esri World Topo Map" = "esri_topo",
-              "Esri World Imagery" = "esri_imagery"
+              "OpenFreeMap Positron" = "ofm_positron",
+              "OpenFreeMap Bright" = "ofm_bright",
+              "Satellite (Sentinel-2)" = "sentinel"
             ),
-            selected = "carto_positron"
+            selected = "ofm_positron"
           ),
           hr(style = "margin: 8px 0;"),
           checkboxInput(

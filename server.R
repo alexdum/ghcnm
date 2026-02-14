@@ -57,12 +57,14 @@ function(input, output, session) {
   style_change_trigger <- reactiveVal(0) # Triggers redraw after style change
   stations_before_id <- reactiveVal(NULL) # Layer ID to insert stations before
   current_raster_layers <- reactiveVal(character(0)) # Track raster layers
+  basemap_debounced <- shiny::debounce(reactive(input$basemap), 200)
 
+  # Render the MapLibre map
   # Render the MapLibre map
   output$station_map <- renderMaplibre({
     print("Initializing MapLibre...")
     maplibre(
-      style = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+      style = ofm_positron_style,
       center = c(initial_lng, initial_lat),
       zoom = initial_zoom
     ) %>%
@@ -75,139 +77,50 @@ function(input, output, session) {
       fly_to(center = c(initial_lng, initial_lat), zoom = initial_zoom)
   })
 
-  # Basemap Switching Logic (Sandwich Method)
-  observeEvent(input$basemap, {
-    req(input$basemap)
-    print(paste("Basemap Change:", input$basemap))
-    proxy <- maplibre_proxy("station_map")
+  # --- Basemap Switching Logic ---
+  label_layer_ids <- c(
+    # OpenFreeMap Positron & Bright common labels
+    "waterway_line_label", "water_name_point_label", "water_name_line_label",
+    "highway-name-path", "highway-name-minor", "highway-name-major",
+    "highway-shield-non-us", "highway-shield-us-interstate", "road_shield_us",
+    "airport", "label_other", "label_village", "label_town", "label_state",
+    "label_city", "label_city_capital", "label_country_3", "label_country_2", "label_country_1",
+    # Bright specific labels (POIs & Directions)
+    "road_oneway", "road_oneway_opposite", "poi_r20", "poi_r7", "poi_r1", "poi_transit",
+    # Dash variants
+    "waterway-line-label", "water-name-point-label", "water-name-line-label",
+    "highway-shield-non-us", "highway-shield-us-interstate", "road-shield-us",
+    "label-other", "label-village", "label-town", "label-state",
+    "label-city", "label-city-capital", "label-country-3", "label-country-2", "label-country-1",
+    # Legacy/Carto/OSM
+    "place_villages", "place_town", "place_country_2", "place_country_1",
+    "place_state", "place_continent", "place_city_r6", "place_city_r5",
+    "place_city_dot_r7", "place_city_dot_r4", "place_city_dot_r2", "place_city_dot_z7",
+    "place_capital_dot_z7", "place_capital", "roadname_minor", "roadname_sec",
+    "roadname_pri", "roadname_major", "motorway_name", "watername_ocean",
+    "watername_sea", "watername_lake", "watername_lake_line", "poi_stadium",
+    "poi_park", "poi_zoo", "airport_label", "country-label", "state-label",
+    "settlement-major-label", "settlement-minor-label", "settlement-subdivision-label",
+    "road-label", "waterway-label", "natural-point-label", "poi-label", "airport-label"
+  )
 
-    # Remove old raster layers
-    old_layers <- isolate(current_raster_layers())
-    if (length(old_layers) > 0) {
-      for (layer_id in old_layers) {
-        proxy %>% clear_layer(layer_id)
-      }
-      current_raster_layers(character(0))
-    }
+  non_label_layer_ids <- c(
+    "background", "park", "water", "landcover_ice_shelf", "landcover_glacier",
+    "landuse_residential", "landcover_wood", "waterway", "building",
+    "tunnel_motorway_casing", "tunnel_motorway_inner", "aeroway-taxiway",
+    "aeroway-runway-casing", "aeroway-area", "aeroway-runway",
+    "road_area_pier", "road_pier", "highway_path", "highway_minor",
+    "highway_major_casing", "highway_major_inner", "highway_major_subtle",
+    "highway_motorway_casing", "highway_motorway_inner", "highway_motorway_subtle",
+    "railway_transit", "railway_transit_dashline", "railway_service",
+    "railway_service_dashline", "railway", "railway_dashline",
+    "highway_motorway_bridge_casing", "highway_motorway_bridge_inner",
+    "boundary_3", "boundary_2", "boundary_disputed"
+  )
 
-    if (input$basemap %in% c("carto_positron", "carto_voyager", "esri_imagery")) {
-      # VECTOR STYLES
-      style_url <- switch(input$basemap,
-        "carto_positron" = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-        "carto_voyager" = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
-        "esri_imagery" = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json" # Voyager for labels
-      )
-
-      proxy %>% set_style(style_url)
-      stations_before_id("watername_ocean") # Insert stations below labels
-
-      # Esri Imagery Special Case (Raster beneath Vector Labels)
-      if (input$basemap == "esri_imagery") {
-        session <- shiny::getDefaultReactiveDomain()
-        selected_basemap <- input$basemap
-
-        later::later(function() {
-          shiny::withReactiveDomain(session, {
-            current_basemap <- isolate(input$basemap)
-            if (current_basemap != selected_basemap) {
-              return()
-            }
-
-            unique_suffix <- as.numeric(Sys.time()) * 1000
-            source_id <- paste0("esri_source_", unique_suffix)
-            layer_id <- paste0("esri_layer_", unique_suffix)
-            esri_url <- "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-
-            maplibre_proxy("station_map") %>%
-              add_raster_source(id = source_id, tiles = c(esri_url), tileSize = 256) %>%
-              add_layer(
-                id = layer_id,
-                type = "raster",
-                source = source_id,
-                paint = list("raster-opacity" = 1),
-                before_id = "watername_ocean"
-              )
-            current_raster_layers(c(layer_id))
-            style_change_trigger(isolate(style_change_trigger()) + 1)
-          })
-        }, delay = 0.5)
-      } else {
-        style_change_trigger(isolate(style_change_trigger()) + 1)
-      }
-    } else {
-      # RASTER STYLES (OSM, Esri Topo)
-      tile_url <- if (input$basemap %in% c("osm", "osm_gray")) {
-        "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-      } else {
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"
-      }
-
-      attribution <- if (input$basemap %in% c("osm", "osm_gray")) {
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      } else {
-        "Tiles &copy; Esri"
-      }
-
-      paint_props <- list("raster-opacity" = 1)
-      if (input$basemap == "osm_gray") {
-        paint_props[["raster-saturation"]] <- -0.9
-        paint_props[["raster-contrast"]] <- 0.3
-      }
-
-      # Blank style
-      blank_style <- list(version = 8, sources = list(), layers = list())
-      json_blank <- jsonlite::toJSON(blank_style, auto_unbox = TRUE)
-      blank_uri <- paste0("data:application/json,", URLencode(as.character(json_blank), reserved = TRUE))
-
-      proxy %>% set_style(blank_uri)
-
-      session <- shiny::getDefaultReactiveDomain()
-      selected_basemap <- input$basemap
-
-      later::later(function() {
-        shiny::withReactiveDomain(session, {
-          if (isolate(input$basemap) != selected_basemap) {
-            return()
-          }
-
-          unique_suffix <- as.numeric(Sys.time()) * 1000
-          source_id <- paste0("raster_source_", unique_suffix)
-          layer_id <- paste0("raster_layer_", unique_suffix)
-
-          maplibre_proxy("station_map") %>%
-            add_raster_source(id = source_id, tiles = c(tile_url), tileSize = 256, attribution = attribution) %>%
-            add_layer(
-              id = layer_id,
-              type = "raster",
-              source = source_id,
-              paint = paint_props
-            )
-
-          stations_before_id(NULL) # On top of raster
-          current_raster_layers(c(layer_id))
-          style_change_trigger(isolate(style_change_trigger()) + 1)
-        })
-      }, delay = 0.5)
-    }
-  })
-
-  # Toggle Labels (Vector only)
-  observeEvent(input$show_labels, {
-    req(input$basemap %in% c("carto_positron", "carto_voyager", "esri_imagery"))
-    visibility <- if (input$show_labels) "visible" else "none"
-    label_layers <- c(
-      "place_villages", "place_town", "place_country_2", "place_country_1",
-      "place_state", "place_continent", "place_city_r6", "place_city_r5",
-      "place_city_dot_r7", "place_city_dot_r4", "place_city_dot_r2", "place_city_dot_z7",
-      "place_capital_dot_z7", "place_capital", "roadname_minor", "roadname_sec",
-      "roadname_pri", "roadname_major", "motorway_name", "watername_ocean",
-      "watername_sea", "watername_lake", "watername_lake_line", "poi_stadium",
-      "poi_park", "poi_zoo", "airport_label", "country-label", "state-label",
-      "settlement-major-label", "settlement-minor-label", "settlement-subdivision-label",
-      "road-label", "waterway-label", "natural-point-label", "poi-label", "airport-label"
-    )
-    proxy <- maplibre_proxy("station_map")
-    for (layer_id in label_layers) {
+  apply_label_visibility <- function(proxy, show_labels) {
+    visibility <- if (isTRUE(show_labels)) "visible" else "none"
+    for (layer_id in label_layer_ids) {
       tryCatch(
         {
           proxy %>% set_layout_property(layer_id, "visibility", visibility)
@@ -215,6 +128,72 @@ function(input, output, session) {
         error = function(e) {}
       )
     }
+  }
+
+  observeEvent(basemap_debounced(), {
+    basemap <- basemap_debounced()
+    proxy <- maplibre_proxy("station_map")
+
+    if (basemap %in% c("ofm_positron", "ofm_bright")) {
+      style_url <- if (basemap == "ofm_positron") ofm_positron_style else ofm_bright_style
+      proxy %>% set_style(style_url, preserve_layers = FALSE)
+      stations_before_id("waterway_line_label")
+
+      current_session <- shiny::getDefaultReactiveDomain()
+      selected_basemap <- basemap
+
+      later::later(function() {
+        shiny::withReactiveDomain(current_session, {
+          current_basemap <- isolate(input$basemap)
+          if (current_basemap != selected_basemap) {
+            return()
+          }
+          apply_label_visibility(maplibre_proxy("station_map"), isolate(input$show_labels))
+          style_change_trigger(isolate(style_change_trigger()) + 1)
+        })
+      }, delay = 0.35)
+    } else if (basemap == "sentinel") {
+      proxy %>% set_style(ofm_positron_style, preserve_layers = FALSE)
+
+      current_session <- shiny::getDefaultReactiveDomain()
+      selected_basemap <- basemap
+
+      later::later(function() {
+        shiny::withReactiveDomain(current_session, {
+          current_basemap <- isolate(input$basemap)
+          if (current_basemap != selected_basemap) {
+            return()
+          }
+
+          unique_suffix <- as.numeric(Sys.time()) * 1000
+          source_id <- paste0("sentinel_source_", unique_suffix)
+          layer_id <- paste0("sentinel_layer_", unique_suffix)
+
+          maplibre_proxy("station_map") %>%
+            add_raster_source(id = source_id, tiles = c(sentinel_url), tileSize = 256, attribution = sentinel_attribution) %>%
+            add_layer(id = layer_id, type = "raster", source = source_id, paint = list("raster-opacity" = 1), before_id = "background")
+
+          for (layer_id_kill in non_label_layer_ids) {
+            tryCatch(
+              {
+                maplibre_proxy("station_map") %>% set_layout_property(layer_id_kill, "visibility", "none")
+              },
+              error = function(e) {}
+            )
+          }
+
+          apply_label_visibility(maplibre_proxy("station_map"), isolate(input$show_labels))
+          stations_before_id("waterway_line_label")
+          style_change_trigger(isolate(style_change_trigger()) + 1)
+        })
+      }, delay = 0.5)
+    }
+  })
+
+  # Toggle Labels
+  observeEvent(input$show_labels, {
+    req(input$basemap %in% c("ofm_positron", "ofm_bright", "sentinel"))
+    apply_label_visibility(maplibre_proxy("station_map"), input$show_labels)
   })
 
   # Initial rendering of all markers
