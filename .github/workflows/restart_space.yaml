@@ -1,0 +1,28 @@
+name: Scheduled Space Restart
+
+on:
+  schedule:
+    # Runs at 01:00 UTC daily
+    - cron: '0 1 * * *'
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  restart:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restart HF Space
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://huggingface.co/api/spaces/alexdum/ghcnm/restart" \
+            -H "Authorization: Bearer ${{ secrets.HF_TOKEN }}")
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "Response: $body"
+          echo "HTTP Code: $http_code"
+          
+          if [ "$http_code" -ne 200 ]; then
+            echo "Failed to restart space"
+            exit 1
+          fi
