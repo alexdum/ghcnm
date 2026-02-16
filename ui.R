@@ -89,12 +89,11 @@ ui <- page_navbar(
         actionButton("home_zoom", bsicons::bs_icon("house-fill"), class = "btn-home", title = "Zoom to all stations")
       ),
       # Map Legend
-      uiOutput("map_legend")
-    ),
+      uiOutput("map_legend"),
 
-    # Conditionally render the panel with the plot when the plotly output is available
-    # Use uiOutput to conditionally render the plot panel
-    uiOutput("plot_panel")
+      # Conditionally render the panel with the plot when the plotly output is available
+      uiOutput("plot_panel")
+    )
   ),
   nav_spacer(),
   nav_item(
