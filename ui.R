@@ -3,13 +3,24 @@ ui <- page_navbar(
   theme = bs_theme(version = 5),
   title = "GHCNm Explorer",
   navbar_options = navbar_options(collapsible = TRUE),
-  header = tags$head(
-    shinyjs::useShinyjs(),
-    tags$link(rel = "canonical", href = "https://climate-insights.netlify.app/ghcnm"),
-    tags$meta(name = "robots", content = "noindex,indexifembedded"),
-    tags$link(rel = "stylesheet", type = "text/css", href = "custom.css?v=1.0"), # Link to custom CSS
-    tags$script(src = "fullscreen.js"),
-    tags$script(src = "app.js?v=1.0")
+  header = tagList(
+    tags$head(
+      shinyjs::useShinyjs(),
+      tags$link(rel = "canonical", href = "https://climate-insights.netlify.app/ghcnm"),
+      tags$meta(name = "robots", content = "noindex,indexifembedded"),
+      tags$link(rel = "stylesheet", type = "text/css", href = "custom.css?v=1.1"),
+      tags$script(src = "fullscreen.js"),
+      tags$script(src = "app.js?v=1.1")
+    ),
+    # Frozen overlay div (startup loading spinner)
+    div(
+      class = "frozen-overlay",
+      div(
+        class = "frozen-overlay-content",
+        div(class = "spinner-border text-primary", role = "status"),
+        p(class = "frozen-overlay-message", "Loading stations...")
+      )
+    )
   ),
   fillable_mobile = T,
   nav_panel(

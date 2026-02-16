@@ -1,5 +1,7 @@
 # Define the server logic
 function(input, output, session) {
+  # Show loading spinner on startup until stations are drawn
+  session$sendCustomMessage("freezeUI", list(text = "Loading stations..."))
   # Reactive expression to filter the Parquet data by year and month
   filtered_parquet_data <- reactive({
     month_number <- match(input$month, month.name)
@@ -57,6 +59,7 @@ function(input, output, session) {
   style_change_trigger <- reactiveVal(0) # Triggers redraw after style change
   stations_before_id <- reactiveVal(NULL) # Layer ID to insert stations before
   current_raster_layers <- reactiveVal(character(0)) # Track raster layers
+  stations_loaded <- reactiveVal(FALSE) # Track if stations have been drawn
   basemap_debounced <- shiny::debounce(reactive(input$basemap), 200)
 
   # Render the MapLibre map
@@ -203,10 +206,13 @@ function(input, output, session) {
   map_initialized <- reactiveVal(FALSE)
 
   # One-time observer to detect map load
+  # Delay slightly to ensure MapLibre style is fully loaded before adding layers
   observe({
     req(input$station_map_zoom)
     if (!map_initialized()) {
-      map_initialized(TRUE)
+      later::later(function() {
+        map_initialized(TRUE)
+      }, delay = 0.5)
     }
   })
 
@@ -216,6 +222,9 @@ function(input, output, session) {
     req(map_initialized()) # Wait for map to be ready
     req(filtered_stations())
     style_change_trigger() # Re-add layer if style changes
+
+    # Show loading spinner while redrawing stations
+    session$sendCustomMessage("freezeUI", list(text = "Loading stations..."))
 
     data <- filtered_stations()
     param <- input$parameter
@@ -242,15 +251,23 @@ function(input, output, session) {
     pal_fun <- colorBin(palette_colors, domain = palette_domain, bins = bins, na.color = "transparent")
 
     # Prepare Data for MapLibre
+    # Vectorized popup HTML (replaces per-row mapply+generateLabel)
+    yr <- input$year_range
+    popup_html <- paste0(
+      "Station: ", data$NAME, "<br>",
+      "Country: ", data$Country, "<br>",
+      "ID: ", data$ID, "<br>",
+      "Elevation: ", data$STNELEV, " m<br>",
+      "Available years: ", data$first_year, " - ", data$last_year, "<br>",
+      "Selected years: ", yr[1], " - ", yr[2], "<br>",
+      prefix, " ", round(data$mean_value, 1), " ", units,
+      "<br><span style='color:red;'>Click to get graph and data</span>"
+    )
+
     map_data <- data %>%
       mutate(
         circle_color = pal_fun(mean_value),
-        # Default (unselected/base) styles
-        # We rely on paint property updates for selection highlighting
-        # Generate Label Content (Tooltip)
-        popup_content = as.character(mapply(function(n, i, e, f, l, m, yr, c, p, u) {
-          generateLabel(n, i, e, f, l, m, yr, c, p, u)
-        }, NAME, ID, STNELEV, first_year, last_year, mean_value, list(input$year_range), Country, prefix, units))
+        popup_content = popup_html
       ) %>%
       st_as_sf(coords = c("LONGITUDE", "LATITUDE"), crs = 4326)
 
@@ -271,9 +288,11 @@ function(input, output, session) {
       )
 
     # Re-apply current selection style immediately after rendering
-    # (Use isolate to avoid reactivity here, though this observer is triggered by data change)
     cur_sel <- isolate(selected_station_id())
     update_selection_style(cur_sel)
+
+    # Dismiss the loading spinner after stations are drawn
+    session$sendCustomMessage("unfreezeUI", list())
   })
 
   # Helper to update selection styles efficiently

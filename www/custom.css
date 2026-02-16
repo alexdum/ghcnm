@@ -68,3 +68,56 @@
   font-size: 85%;
   /* Reduce text size by 15% */
 }
+
+/* Frozen overlay - blocks all interactions during loading */
+.frozen-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.3);
+  z-index: 9999;
+  display: none;
+  cursor: wait;
+}
+
+.frozen-overlay.active {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: flex-end !important;
+  padding: 80px 30px 30px 30px !important;
+}
+
+.frozen-overlay-content {
+  position: relative;
+  background: white;
+  width: 400px;
+  min-height: 200px;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.frozen-overlay-content .spinner-border {
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 15px;
+}
+
+.frozen-overlay-content p {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #333;
+}
+
+/* Disable pointer events on navbar when frozen */
+body.ui-frozen .navbar {
+  pointer-events: none;
+  opacity: 0.6;
+}

@@ -4,6 +4,18 @@ $(document).on('shiny:connected', function () {
     // console.log("Shiny connected to bridge");
 });
 
+// Freeze/Unfreeze UI (loading spinner overlay)
+Shiny.addCustomMessageHandler('freezeUI', function (message) {
+    $('body').addClass('ui-frozen');
+    $('.frozen-overlay').addClass('active');
+    $('.frozen-overlay-message').html(message.text || 'Loading data...');
+});
+
+Shiny.addCustomMessageHandler('unfreezeUI', function (message) {
+    $('body').removeClass('ui-frozen');
+    $('.frozen-overlay').removeClass('active');
+});
+
 // Update parent page URL and context
 Shiny.addCustomMessageHandler('updateParentURL', function (message) {
     // console.log("Updating parent URL with GHCNM state:", message);
