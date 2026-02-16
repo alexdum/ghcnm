@@ -121,3 +121,49 @@ body.ui-frozen .navbar {
   pointer-events: none;
   opacity: 0.6;
 }
+
+#zoom_home_panel {
+  z-index: 999 !important;
+}
+
+.btn-home {
+  background: white;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  color: #444;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-home:hover {
+  background: #f4f4f4;
+  color: #000;
+}
+
+@media (max-width: 768px) {
+
+  /* Hide MapLibre navigation control (zoom +/-) on mobile */
+  .maplibregl-ctrl-top-left .maplibregl-ctrl-group,
+  .mapboxgl-ctrl-top-left .mapboxgl-ctrl-group {
+    display: none !important;
+  }
+
+  /* Hide layer control panel on mobile */
+  .map-layer-control {
+    display: none !important;
+  }
+
+  /* Hide plotly modebar (zoom/pan/download toolbar) on mobile */
+  .plotly .modebar-container {
+    display: none !important;
+  }
+
+  /* Hide map legend on mobile */
+  #map_legend {
+    display: none !important;
+  }
+}

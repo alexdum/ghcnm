@@ -23,40 +23,41 @@ ui <- page_navbar(
     )
   ),
   fillable_mobile = T,
+  sidebar = sidebar(
+    title = "Filters",
+    open = list(desktop = "open", mobile = "closed"),
+    # Slider for selecting a range of years (first_year and last_year)
+    sliderInput("year_range", "Select Year Range:",
+      min = 1750,
+      max = max(stations_data$last_year, na.rm = TRUE),
+      value = c(1961, max(stations_data$last_year, na.rm = TRUE)),
+      step = 1,
+      sep = ""
+    ),
+
+    # Select input for parameter
+    selectInput("parameter", "Select Parameter:",
+      choices = c("Temperature", "Precipitation"),
+      selected = "Temperature"
+    ),
+
+    # Select input for choosing a month
+    selectInput("month", "Select Month:",
+      choices = month.name, selected = month.name[1]
+    ),
+    hr(),
+    p("Data source: NCEI GHCN monthly"),
+    hr(),
+    tags$small("Tip: Click map points to view detailed weather plots.")
+  ),
   nav_panel(
     "Data Explorer",
-    #   layout_sidebar(
-    #     # Sidebar content
-    #     sidebar = sidebar(
-    #       open = list(desktop = "open", mobile = "always-above"),
-    #       # Slider for selecting a range of years (first_year and last_year)
-    #       sliderInput("year_range", "Select Year Range:",
-    #                   min = min(stations_data$first_year, na.rm = TRUE),
-    #                   max = max(stations_data$last_year, na.rm = TRUE),
-    #                   value = c(1961,
-    #                             max(stations_data$last_year, na.rm = TRUE)),
-    #                   step = 1,
-    #                   sep = ""),
-    #
-    #       # Select input for choosing a month
-    #       selectInput("month", "Select Month:",
-    #                   choices = month.name, selected = month.name[1])
-    #     ),
-    #     card(
-    #       full_screen = TRUE,
-    #       card_header(h6(textOutput("map_title"))),
-    #       # Main panel content
-    #       leafletOutput("station_map", height = "90vh")
-    #     )
-    #   )
-
-
     div(
       style = "position: relative; height: 100%; width: 100%;",
       maplibreOutput("station_map", width = "100%", height = "100%"),
-      # Layer Control (Below Navigation Control)
+      # Layer Control Panel (Collapsible)
       absolutePanel(
-        top = 160, right = 10, left = "auto",
+        top = 130, left = 10, right = "auto",
         class = "map-layer-control",
         style = "z-index: 1000;",
         div(class = "control-icon", icon("layer-group")),
@@ -80,42 +81,15 @@ ui <- page_navbar(
           )
         )
       ),
-      # Home Zoom Button (Below Navigation and above Layer Control)
+
+      # Home Button Overlay
       absolutePanel(
-        top = 110, right = 10, left = "auto",
-        style = "z-index: 1000;",
-        actionButton(
-          inputId = "home_zoom",
-          label = NULL,
-          icon = icon("house"),
-          style = "background-color: white; border: none; border-radius: 4px; box-shadow: 0 0 5px rgba(0,0,0,0.3); width: 36px; height: 36px; padding: 0; color: #333;"
-        )
+        id = "zoom_home_panel",
+        top = 80, left = 10, right = "auto",
+        actionButton("home_zoom", bsicons::bs_icon("house-fill"), class = "btn-home", title = "Zoom to all stations")
       ),
       # Map Legend
       uiOutput("map_legend")
-    ),
-    absolutePanel(
-      top = 80, left = 30, right = "auto", bottom = "auto",
-      width = 150, height = "auto",
-      # Slider for selecting a range of years (first_year and last_year)
-      sliderInput("year_range", "Select Year Range:",
-        min = 1750,
-        max = max(stations_data$last_year, na.rm = TRUE),
-        value = c(1961, max(stations_data$last_year, na.rm = TRUE)),
-        step = 1,
-        sep = ""
-      ),
-
-      # Select input for parameter
-      selectInput("parameter", "Select Parameter:",
-        choices = c("Temperature", "Precipitation"),
-        selected = "Temperature"
-      ),
-
-      # Select input for choosing a month
-      selectInput("month", "Select Month:",
-        choices = month.name, selected = month.name[1]
-      ),
     ),
 
     # Conditionally render the panel with the plot when the plotly output is available

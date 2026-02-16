@@ -71,7 +71,7 @@ function(input, output, session) {
       center = c(initial_lng, initial_lat),
       zoom = initial_zoom
     ) %>%
-      add_navigation_control(show_compass = FALSE, visualize_pitch = FALSE, position = "top-right")
+      add_navigation_control(show_compass = FALSE, visualize_pitch = FALSE, position = "top-left")
   })
 
   # Initialize map bounds / Home Zoom
@@ -561,9 +561,9 @@ function(input, output, session) {
         bottom = 30, # Position from the bottom
         left = "50%", # Start from the middle of the screen
         right = "auto",
-        width = 450,
+        width = "95%",
         height = "auto",
-        style = "transform: translateX(-50%); background-color: rgba(255, 255, 255, 0.8); border-radius: 10px; padding: 10px;", # Transparent background with some styling
+        style = "transform: translateX(-50%); max-width: 450px; background-color: rgba(255, 255, 255, 0.8); border-radius: 10px; padding: 10px;", # Transparent background with some styling
 
         # Time series plot
         plotlyOutput("time_series_plot", height = "200px"),
