@@ -17,6 +17,7 @@ RUN install2.r --error \
     leaflet \
     plotly \
     bsicons \
+    shinyjs \
     sf
 
 # Install development packages from GitHub
