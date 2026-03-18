@@ -17,6 +17,7 @@ RUN install2.r --error \
     leaflet \
     plotly \
     bsicons \
+    mapgl \
     shinyjs \
     sf
 
