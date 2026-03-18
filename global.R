@@ -3,9 +3,7 @@ library(shiny)
 library(leaflet)
 library(dplyr)
 library(bslib)
-library(leaflet.extras)
 library(arrow) # For reading Parquet files
-library(scales) # For color scaling
 library(plotly)
 library(bsicons)
 library(shinyjs)
@@ -13,7 +11,6 @@ library(shinyjs)
 
 source("utils/render_time_series_plot.R", local = T)
 source("utils/generateLabel.R", local = T)
-library(mapgl)
 library(sf)
 
 # OpenFreeMap Style URLs

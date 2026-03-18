@@ -12,17 +12,11 @@ RUN apt-get update && apt-get install -y \
 
 # Install stable packages from CRAN
 RUN install2.r --error \
-    ggExtra \
     shiny \
-    highcharter \
     arrow \
     leaflet \
-    leaflet.extras \
-    markdown \
     plotly \
-    orca \
     bsicons \
-    mapgl \
     sf
 
 # Install development packages from GitHub
