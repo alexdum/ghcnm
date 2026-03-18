@@ -47,6 +47,7 @@ ui <- page_navbar(
     ),
     hr(),
     p("Data source: NCEI GHCN monthly"),
+    markdown(paste("**Data available until:**", latest_data_label)),
     hr(),
     tags$small("Tip: Click map points to view detailed weather plots.")
   ),

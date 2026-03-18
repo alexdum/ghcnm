@@ -75,6 +75,22 @@ stations_data <- merge(tavg_meta, tavg_avail, by = "ID")
 tavg_dataset <- open_dataset("www/data/tabs/tavg_long.parquet")
 prec_dataset <- open_dataset("www/data/tabs/prec_long.parquet")
 
+# Determine the latest available date for the UI sidebar
+latest_year <- tavg_dataset %>%
+    filter(VALUE != -99.99) %>%
+    summarize(max_y = max(YEAR, na.rm = TRUE)) %>%
+    collect() %>%
+    pull(max_y)
+
+latest_month <- tavg_dataset %>%
+    filter(YEAR == latest_year, VALUE != -99.99) %>%
+    summarize(max_m = max(MONTH, na.rm = TRUE)) %>%
+    collect() %>%
+    pull(max_m)
+
+# Format as "February 2025" using R's built-in month.name constant
+latest_data_label <- paste(month.name[latest_month], latest_year)
+
 # Read country codes
 country_codes <- read.table("www/data/tabs/ghcnd-countries.txt", fill = TRUE, quote = "", comment.char = "")
 # The file has code in first column and name in the rest.
