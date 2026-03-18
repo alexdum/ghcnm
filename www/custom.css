@@ -167,3 +167,32 @@ body.ui-frozen .navbar {
     display: none !important;
   }
 }
+
+/* Data Info Box Styling */
+.data-info-box {
+  background-color: #f8f9fa;
+  border-left: 4px solid #007bff;
+  padding: 12px;
+  border-radius: 0 6px 6px 0;
+  margin: 15px 0;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.data-info-title {
+  font-weight: 700;
+  color: #495057;
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.data-info-item {
+  color: #6c757d;
+  margin-bottom: 2px;
+}
+
+.fw-bold {
+  color: #343a40;
+}
