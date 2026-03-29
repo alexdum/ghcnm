@@ -19,7 +19,8 @@ RUN install2.r --error \
     bsicons \
     mapgl \
     shinyjs \
-    sf
+    sf \
+    remotes
 
 # Install development packages from GitHub
 RUN installGithub.r \
