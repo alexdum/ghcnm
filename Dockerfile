@@ -1,6 +1,11 @@
 FROM rocker/shiny-verse:latest
 
-WORKDIR /code
+RUN useradd -m -u 1000 user
+
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
+
+WORKDIR $HOME/app
 
 # Install system dependencies for sf/mapgl
 RUN apt-get update && apt-get install -y \
@@ -27,6 +32,10 @@ RUN installGithub.r \
     rstudio/bslib \
     rstudio/httpuv
 
-COPY . .
+COPY --chown=user . $HOME/app
 
-CMD ["R", "--quiet", "-e", "shiny::runApp(host='0.0.0.0', port=7860)"]
+USER user
+
+EXPOSE 7860
+
+CMD ["R", "--quiet", "-e", "shiny::runApp('/home/user/app', host='0.0.0.0', port=7860)"]
