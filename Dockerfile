@@ -5,6 +5,8 @@ RUN useradd -m -u 1000 user
 ENV HOME=/home/user \
     PATH=/home/user/.local/bin:$PATH
 
+RUN mkdir -p $HOME/app && chown user:user $HOME/app
+
 WORKDIR $HOME/app
 
 # Install system dependencies for sf/mapgl
