@@ -73,21 +73,35 @@ stations_data <- merge(tavg_meta, tavg_avail, by = "ID")
 tavg_dataset <- open_dataset("www/data/tabs/tavg_long.parquet")
 prec_dataset <- open_dataset("www/data/tabs/prec_long.parquet")
 
-# Determine the latest available date for the UI sidebar
-latest_year <- tavg_dataset %>%
+# Determine the latest available date for Temperature
+latest_year_tavg <- tavg_dataset %>%
     filter(VALUE != -99.99) %>%
     summarize(max_y = max(YEAR, na.rm = TRUE)) %>%
     collect() %>%
     pull(max_y)
 
-latest_month <- tavg_dataset %>%
-    filter(YEAR == latest_year, VALUE != -99.99) %>%
+latest_month_tavg <- tavg_dataset %>%
+    filter(YEAR == latest_year_tavg, VALUE != -99.99) %>%
     summarize(max_m = max(MONTH, na.rm = TRUE)) %>%
     collect() %>%
     pull(max_m)
 
-# Format as "February 2025" using R's built-in month.name constant
-latest_data_label <- paste(month.name[latest_month], latest_year)
+# Determine the latest available date for Precipitation
+latest_year_prec <- prec_dataset %>%
+    filter(VALUE != -99.99) %>%
+    summarize(max_y = max(YEAR, na.rm = TRUE)) %>%
+    collect() %>%
+    pull(max_y)
+
+latest_month_prec <- prec_dataset %>%
+    filter(YEAR == latest_year_prec, VALUE != -99.99) %>%
+    summarize(max_m = max(MONTH, na.rm = TRUE)) %>%
+    collect() %>%
+    pull(max_m)
+
+# Format for UI display showing both
+latest_data_label <- paste0(month.name[latest_month_tavg], " ", latest_year_tavg, " (Temp) | ", 
+                            month.name[latest_month_prec], " ", latest_year_prec, " (Precip)")
 
 # Read country codes
 country_codes <- read.table("www/data/tabs/ghcnd-countries.txt", fill = TRUE, quote = "", comment.char = "")
