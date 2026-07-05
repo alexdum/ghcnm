@@ -145,6 +145,39 @@ body.ui-frozen .navbar {
 }
 
 @media (max-width: 768px) {
+  .container,
+  .container-fluid,
+  .container-sm,
+  .container-md {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .tab-content {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .tab-content > .tab-pane > .card,
+  .tab-content > .active > .card {
+    border-left: none !important;
+    border-right: none !important;
+    border-radius: 0 !important;
+  }
+
+  .tab-content > .tab-pane > .card > .card-body,
+  .tab-content > .active > .card > .card-body,
+  .tab-content > .tab-pane > .card-body,
+  .tab-content > .active > .card-body {
+    padding: 4px !important;
+  }
+
+  .bslib-page-fill,
+  .bslib-gap-spacing,
+  .bslib-sidebar-layout > .main {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
 
   /* Hide MapLibre navigation control (zoom +/-) on mobile */
   .maplibregl-ctrl-top-left .maplibregl-ctrl-group,
