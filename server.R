@@ -532,6 +532,7 @@ function(input, output, session) {
 
     # Update the time series plot when month or year inputs change
     output$time_series_plot <- renderPlotly({
+      is_mag <- plot_magnified() # Force redraw when magnification changes
       data <- time_series_data() # Get the filtered time series data
       req(nrow(data) > 0) # Ensure there is data to plot
 
@@ -553,20 +554,28 @@ function(input, output, session) {
   outputOptions(output, "plot_available", suspendWhenHidden = FALSE)
 
   # Inside your server.R or server function
+  plot_magnified <- reactiveVal(FALSE)
+
+  observeEvent(input$toggle_magnify, {
+    plot_magnified(!plot_magnified())
+  })
 
   output$plot_panel <- renderUI({
     if (plot_available()) {
+      is_magnified <- plot_magnified()
+
       absolutePanel(
         draggable = F,
-        bottom = 30, # Position from the bottom
+        top = if(is_magnified) "50%" else "auto",
+        bottom = if(is_magnified) "auto" else 30, # Position from the bottom
         left = "50%", # Start from the middle of the screen
         right = "auto",
-        width = "95%",
+        width = if(is_magnified) "90%" else "95%",
         height = "auto",
-        style = "transform: translateX(-50%); max-width: 450px; background-color: rgba(255, 255, 255, 0.8); border-radius: 10px; padding: 10px;", # Transparent background with some styling
+        style = if(is_magnified) "transform: translate(-50%, -50%); max-width: 1000px; background-color: rgba(255, 255, 255, 0.95); border-radius: 10px; padding: 20px; box-shadow: 0px 0px 20px rgba(0,0,0,0.5); z-index: 1050;" else "transform: translateX(-50%); max-width: 450px; background-color: rgba(255, 255, 255, 0.8); border-radius: 10px; padding: 10px;", # Transparent background with some styling
 
         # Time series plot
-        plotlyOutput("time_series_plot", height = "200px"),
+        plotlyOutput("time_series_plot", height = if(is_magnified) "60vh" else "200px"),
 
         # Download button positioned right below the plot, aligned to the left
         downloadButton(
@@ -576,7 +585,16 @@ function(input, output, session) {
           class = "custom-download-button", # Custom CSS class for styling
           style = "float: left; margin-top: -10px;" # Aligns the button to the left and positions it below the plot
         ) |>
-          tooltip("Download data") # bslib data
+          tooltip("Download data"), # bslib data
+          
+        # Magnify button positioned right below the plot, aligned to the right
+        actionButton(
+          inputId = "toggle_magnify",
+          label = NULL,
+          icon = if(is_magnified) icon("compress") else icon("expand"),
+          style = "float: right; margin-top: -10px; padding: 4px 10px;"
+        ) |>
+          tooltip(if(is_magnified) "Restore plot" else "Magnify plot")
       )
     }
   })
