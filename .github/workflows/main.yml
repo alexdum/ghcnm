@@ -48,16 +48,15 @@ jobs:
       - name: Verify LFS Tracking
         run: git lfs ls-files
 
-      # Step 6: Add Hugging Face Remote
-      - name: Add Hugging Face Remote
+      # Step 6: Deploy Snapshot to Hugging Face Hub (Without History)
+      - name: Deploy Snapshot to Hugging Face Hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
+          git config --global user.email "alexandru.dumitrescu@gmail.com"
+          git config --global user.name "alexdum"
+          git checkout --orphan deploy
+          git add -A
+          git commit -m "Deploy snapshot without history"
           git remote add hf https://alexdum:${HF_TOKEN}@huggingface.co/spaces/alexdum/ghcnm
-
-      # Step 7: Force Push to Hugging Face Hub
-      - name: Force Push to Hugging Face Hub
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          git push hf main --force
+          git push hf deploy:main --force
