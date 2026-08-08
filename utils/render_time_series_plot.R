@@ -60,7 +60,7 @@ render_time_series_plot <- function(data, station_id, month, y_label = "Temperat
       showlegend = FALSE,
       plot_bgcolor = "rgba(255, 255, 255, 0)",
       paper_bgcolor = "rgba(255, 255, 255, 0)",
-      margin = list(l = 20, r = 5, t = 20, b = 3), # Increase bottom margin to accommodate text
+      margin = list(l = 20, r = 5, t = 20, b = 30), # Increase bottom margin to accommodate text
       shapes = list(
         list(
           type = "rect",
@@ -78,7 +78,8 @@ render_time_series_plot <- function(data, station_id, month, y_label = "Temperat
       annotations = list(
         list(
           x = 0.5, # Center the text horizontally
-          y = -0.12, # Position it further below the plot
+          y = 0, # Position it at the bottom of the plot area
+          yshift = -20, # Shift it down by 20 pixels
           xref = "paper",
           yref = "paper",
           showarrow = FALSE,
