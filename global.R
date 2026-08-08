@@ -100,8 +100,10 @@ latest_month_prec <- prec_dataset %>%
     pull(max_m)
 
 # Format for UI display showing both
-latest_data_label <- paste0(month.name[latest_month_tavg], " ", latest_year_tavg, " (Temp) | ", 
-                            month.name[latest_month_prec], " ", latest_year_prec, " (Precip)")
+latest_data_label <- paste0(
+    month.name[latest_month_tavg], " ", latest_year_tavg, " (Temp) | ",
+    month.name[latest_month_prec], " ", latest_year_prec, " (Precip)"
+)
 
 # Read country codes
 country_codes <- read.table("www/data/tabs/ghcnd-countries.txt", fill = TRUE, quote = "", comment.char = "")
