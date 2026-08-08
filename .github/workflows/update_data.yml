@@ -31,6 +31,7 @@ jobs:
       # Step 4: Fetch and Process Data (This might take some time)
       - name: Fetch and Process Data
         run: |
+          mkdir -p misc/data
           python misc/Python/ghcnm_read_prec.py
           python misc/Python/ghcnm_read_tavg.py
           
