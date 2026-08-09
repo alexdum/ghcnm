@@ -560,6 +560,12 @@ function(input, output, session) {
     plot_magnified(!plot_magnified())
   })
 
+  observeEvent(input$escape_key_pressed, {
+    if (plot_magnified()) {
+      plot_magnified(FALSE)
+    }
+  })
+
   output$plot_panel <- renderUI({
     if (plot_available()) {
       is_magnified <- plot_magnified()

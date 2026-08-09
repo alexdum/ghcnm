@@ -48,4 +48,11 @@ $(document).ready(function () {
     $(document).on('change', '.map-layer-control input[type="radio"]', function () {
         $('.map-layer-control').removeClass('expanded');
     });
+
+    // Escape key to close maximized plot
+    $(document).on('keydown', function(e) {
+        if (e.key === "Escape") {
+            Shiny.setInputValue('escape_key_pressed', Math.random());
+        }
+    });
 });

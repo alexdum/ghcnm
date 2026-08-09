@@ -22,6 +22,15 @@ render_time_series_plot <- function(data, station_id, month, y_label = "Temperat
   linear_model <- lm(VALUE ~ YEAR, data = data)
   slope <- coef(linear_model)["YEAR"]
 
+  # Complete the dataset with missing years to break the line on the plot
+  if (nrow(data) > 0) {
+    all_years <- data.frame(YEAR = min(data$YEAR, na.rm = TRUE):max(data$YEAR, na.rm = TRUE))
+    data <- merge(all_years, data, by = "YEAR", all.x = TRUE)
+  }
+  
+  # Calculate trend line values for all years
+  data$Trend <- predict(linear_model, newdata = data)
+
   # Create the title with slope
   title_text <- paste(
     month, min(data$YEAR), max(data$YEAR), "-", station_name, station_id
@@ -35,7 +44,8 @@ render_time_series_plot <- function(data, station_id, month, y_label = "Temperat
   plot <- plot_ly(data,
     x = ~YEAR, y = ~VALUE, type = "scatter", mode = "lines",
     name = "Value", # Set neutral name
-    line = list(color = line_color)
+    line = list(color = line_color),
+    connectgaps = FALSE
   ) %>%
     layout(
       title = list(
@@ -92,10 +102,11 @@ render_time_series_plot <- function(data, station_id, month, y_label = "Temperat
     ) %>%
     add_trace(
       x = ~YEAR,
-      y = fitted(linear_model),
+      y = ~Trend,
       mode = "lines",
       name = "Linear Trend",
       line = list(color = "gray"),
+      connectgaps = FALSE,
       hoverinfo = "x+y" # Display only x and y without custom text
     )
 
