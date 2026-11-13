@@ -1,35 +1,47 @@
 # Define the server logic
 function(input, output, session) {
+  is_temp_param <- function(param) {
+    !is.null(param) && length(param) > 0 && param[1] %in% c("Temperature", "Air Temperature")
+  }
+
   # Show loading spinner on startup until stations are drawn
   session$sendCustomMessage("freezeUI", list(text = "Loading stations..."))
   # Reactive expression to filter the Parquet data by year and month
   filtered_parquet_data <- reactive({
+    req(input$month, input$year_range)
     month_number <- match(input$month, month.name)
+    req(!is.na(month_number))
+
+    yr_start <- as.integer(input$year_range[1])
+    yr_end <- as.integer(input$year_range[2])
+    span_years <- max(1L, yr_end - yr_start + 1L)
+    min_years <- max(1L, as.integer(ceiling(0.80 * span_years)))
 
     # Determine which dataset to use based on input parameter
-    dataset <- if (input$parameter %in% c("Temperature", "Air Temperature")) tavg_dataset else prec_dataset
+    dataset <- if (is_temp_param(input$parameter)) tavg_dataset else prec_dataset
 
-    # Filter the dataset using arrow's dplyr interface
+    # Filter the dataset using arrow's dplyr interface and enforce >=80% completeness
     dataset %>%
       filter(
         VALUE >= -90,
-        YEAR >= input$year_range[1],
-        YEAR <= input$year_range[2],
+        as.integer(YEAR) >= yr_start,
+        as.integer(YEAR) <= yr_end,
         MONTH == month_number
       ) %>%
       group_by(ID) %>%
-      # For precipitation, we might want sum instead of mean if it was daily, but these are likely monthly means/totals?
-      # Assuming monthly values are already means for temp and totals for precip.
-      # If we aggregate over years (multiannual mean), we want mean of the monthly values.
-      summarize(mean_value = mean(VALUE, na.rm = TRUE)) %>%
-      collect() # Collect only the filtered and summarized data
+      summarize(
+        mean_value = mean(VALUE, na.rm = TRUE),
+        n_years = n()
+      ) %>%
+      collect() %>%
+      filter(n_years >= min_years)
   })
 
   # Reactive expression to filter the stations based on year range and Parquet data
   filtered_stations <- reactive({
     filtered_data <- filtered_parquet_data()
     # Determine which station metadata to use
-    stations_info <- if (input$parameter %in% c("Temperature", "Air Temperature")) stations_data else prec_stations_data
+    stations_info <- if (is_temp_param(input$parameter)) stations_data else prec_stations_data
 
     # Join filtered data with station data
     stations_info %>%
@@ -142,64 +154,73 @@ function(input, output, session) {
       proxy %>% set_style(style_url, preserve_layers = FALSE)
       stations_before_id("waterway_line_label")
 
-      current_session <- shiny::getDefaultReactiveDomain()
+      current_session <- session
       selected_basemap <- basemap
 
       later::later(function() {
-        shiny::withReactiveDomain(current_session, {
-          current_basemap <- isolate(input$basemap)
-          if (current_basemap != selected_basemap) {
-            return()
+        tryCatch({
+          if (!is.null(current_session) && is.function(current_session$isClosed) && current_session$isClosed()) {
+            return(invisible(NULL))
           }
-          apply_label_visibility(maplibre_proxy("station_map"), isolate(input$show_labels))
-          style_change_trigger(isolate(style_change_trigger()) + 1)
-        })
+          shiny::withReactiveDomain(current_session, {
+            current_basemap <- isolate(input$basemap)
+            if (is.null(current_basemap) || current_basemap != selected_basemap) {
+              return()
+            }
+            apply_label_visibility(maplibre_proxy("station_map"), isolate(input$show_labels))
+            style_change_trigger(isolate(style_change_trigger()) + 1)
+          })
+        }, error = function(e) NULL)
       }, delay = 0.35)
     } else if (basemap == "sentinel") {
       proxy %>% set_style(ofm_positron_style, preserve_layers = FALSE)
 
-      current_session <- shiny::getDefaultReactiveDomain()
+      current_session <- session
       selected_basemap <- basemap
 
       later::later(function() {
-        shiny::withReactiveDomain(current_session, {
-          current_basemap <- isolate(input$basemap)
-          if (current_basemap != selected_basemap) {
-            return()
+        tryCatch({
+          if (!is.null(current_session) && is.function(current_session$isClosed) && current_session$isClosed()) {
+            return(invisible(NULL))
           }
+          shiny::withReactiveDomain(current_session, {
+            current_basemap <- isolate(input$basemap)
+            if (is.null(current_basemap) || current_basemap != selected_basemap) {
+              return()
+            }
 
-          unique_suffix <- as.numeric(Sys.time()) * 1000
-          source_id <- paste0("sentinel_source_", unique_suffix)
-          layer_id <- paste0("sentinel_layer_", unique_suffix)
+            unique_suffix <- as.numeric(Sys.time()) * 1000
+            source_id <- paste0("sentinel_source_", unique_suffix)
+            layer_id <- paste0("sentinel_layer_", unique_suffix)
 
-          maplibre_proxy("station_map") %>%
-            add_raster_source(id = source_id, tiles = c(sentinel_url), tileSize = 256, attribution = sentinel_attribution) %>%
-            add_layer(id = layer_id, type = "raster", source = source_id, paint = list("raster-opacity" = 1), before_id = "background")
+            maplibre_proxy("station_map") %>%
+              add_raster_source(id = source_id, tiles = c(sentinel_url), tileSize = 256, attribution = sentinel_attribution) %>%
+              add_layer(id = layer_id, type = "raster", source = source_id, paint = list("raster-opacity" = 1), before_id = "background")
 
-          for (layer_id_kill in non_label_layer_ids) {
-            tryCatch(
-              {
-                maplibre_proxy("station_map") %>% set_layout_property(layer_id_kill, "visibility", "none")
-              },
-              error = function(e) {}
-            )
-          }
+            for (layer_id_kill in non_label_layer_ids) {
+              tryCatch(
+                {
+                  maplibre_proxy("station_map") %>% set_layout_property(layer_id_kill, "visibility", "none")
+                },
+                error = function(e) {}
+              )
+            }
 
-          apply_label_visibility(maplibre_proxy("station_map"), isolate(input$show_labels))
-          stations_before_id("waterway_line_label")
-          style_change_trigger(isolate(style_change_trigger()) + 1)
-        })
+            apply_label_visibility(maplibre_proxy("station_map"), isolate(input$show_labels))
+            stations_before_id("waterway_line_label")
+            style_change_trigger(isolate(style_change_trigger()) + 1)
+          })
+        }, error = function(e) NULL)
       }, delay = 0.5)
     }
-  })
+  }, ignoreInit = TRUE)
 
   # Toggle Labels
   observeEvent(input$show_labels, {
     req(input$basemap %in% c("ofm_positron", "ofm_bright", "sentinel"))
     apply_label_visibility(maplibre_proxy("station_map"), input$show_labels)
-  })
+  }, ignoreInit = TRUE)
 
-  # Initial rendering of all markers
   # Initial rendering of all markers
   # Render Stations Layer (MapLibre)
   # Flag to track if map is initialized
@@ -210,8 +231,14 @@ function(input, output, session) {
   observe({
     req(input$station_map_zoom)
     if (!map_initialized()) {
+      current_session <- session
       later::later(function() {
-        map_initialized(TRUE)
+        tryCatch({
+          if (!is.null(current_session) && is.function(current_session$isClosed) && current_session$isClosed()) {
+            return(invisible(NULL))
+          }
+          map_initialized(TRUE)
+        }, error = function(e) NULL)
       }, delay = 0.5)
     }
   })
@@ -231,7 +258,7 @@ function(input, output, session) {
     # Note: We do NOT depend on selected_station_id() here to avoid full redraws on click
 
     # Define palettes and units
-    if (param %in% c("Temperature", "Air Temperature")) {
+    if (is_temp_param(param)) {
       palette_domain <- data$mean_value
       bins <- c(-Inf, -40, -30, -20, -15, -12.5, -10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30, 35, 40, Inf)
       blues <- colorRampPalette(c("#053061", "#4393c3", "#d1e5f0"))(10)
@@ -253,13 +280,14 @@ function(input, output, session) {
     # Prepare Data for MapLibre
     # Vectorized popup HTML (replaces per-row mapply+generateLabel)
     yr <- input$year_range
+    span_years <- max(1L, as.integer(yr[2]) - as.integer(yr[1]) + 1L)
     popup_html <- paste0(
       "Station: ", data$NAME, "<br>",
       "Country: ", data$Country, "<br>",
       "ID: ", data$ID, "<br>",
       "Elevation: ", data$STNELEV, " m<br>",
       "Available years: ", data$first_year, " - ", data$last_year, "<br>",
-      "Selected years: ", yr[1], " - ", yr[2], "<br>",
+      "Selected years: ", yr[1], " - ", yr[2], " (", data$n_years, "/", span_years, " yrs)<br>",
       prefix, " ", round(data$mean_value, 1), " ", units,
       "<br><span style='color:red;'>Click to get graph and data</span>"
     )
@@ -336,38 +364,40 @@ function(input, output, session) {
   # Reactive expression to retrieve time series data for the selected station and year/month inputs
   time_series_data <- reactive({
     req(selected_station_id()) # Ensure a station is clicked
+    req(input$month, input$year_range)
 
     station_id <- selected_station_id()
-    month <- input$month
-    dataset <- if (input$parameter == "Temperature") tavg_dataset else prec_dataset
+    month_num <- match(input$month, month.name)
+    req(!is.na(month_num))
+    yr_start <- as.integer(input$year_range[1])
+    yr_end <- as.integer(input$year_range[2])
+    dataset <- if (is_temp_param(input$parameter)) tavg_dataset else prec_dataset
 
     # Filter the dataset based on selected station, month, and year range
-    time_series_data <-
-      dataset %>%
+    dataset %>%
       filter(
         VALUE >= -90,
-        YEAR >= input$year_range[1],
-        YEAR <= input$year_range[2],
-        MONTH == match(input$month, month.name),
+        as.integer(YEAR) >= yr_start,
+        as.integer(YEAR) <= yr_end,
+        MONTH == month_num,
         ID == station_id
       ) %>%
-      collect() |>
-      mutate(YEAR = as.numeric(YEAR))
-
-    time_series_data
+      collect() %>%
+      mutate(YEAR = as.integer(YEAR))
   })
 
 
-  # Observer to handle rendering of the time series plot when inputs (month, year) or station selection change
+  # Render the monthly time series plot reactively when inputs or station selection change
   output$time_series_plot <- renderPlotly({
+    is_mag <- plot_magnified() # Force redraw when magnification changes
     data <- time_series_data() # Get the filtered time series data
     req(nrow(data) > 0) # Ensure there is data to plot
 
     station_id <- selected_station_id()
     month <- input$month
-    param <- input$parameter
-    y_label <- if (param == "Temperature") "Temperature (°C)" else "Precipitation (mm)"
-    title <- if (param == "Temperature") "Daily Mean Temperature" else "Total Precipitation"
+    is_temp <- is_temp_param(input$parameter)
+    y_label <- if (is_temp) "Temperature (°C)" else "Precipitation (mm)"
+    title <- if (is_temp) "Monthly Mean Temperature" else "Total Precipitation"
 
     render_time_series_plot(data, station_id, month, y_label, title)
   })
@@ -448,12 +478,18 @@ function(input, output, session) {
       # 4. Station Selection
       if (!is.null(params$station)) {
         station_ref <- params$station
+        current_session <- session
         shinyjs::delay(1000, {
-          stations_info <- if (input$parameter %in% c("Temperature", "Air Temperature")) stations_data else prec_stations_data
-          match <- stations_info %>% filter(ID == station_ref | NAME == station_ref)
-          if (nrow(match) > 0) {
-            selected_station_id(match$ID[1])
-          }
+          tryCatch({
+            if (!is.null(current_session) && is.function(current_session$isClosed) && current_session$isClosed()) {
+              return(invisible(NULL))
+            }
+            stations_info <- if (is_temp_param(input$parameter)) stations_data else prec_stations_data
+            match <- stations_info %>% filter(ID == station_ref | NAME == station_ref)
+            if (nrow(match) > 0) {
+              selected_station_id(match$ID[1])
+            }
+          }, error = function(e) NULL)
         })
       }
     }
@@ -465,7 +501,7 @@ function(input, output, session) {
     sid <- selected_station_id()
     st_meta <- NULL
     if (!is.null(sid)) {
-      stations_info <- if (input$parameter %in% c("Temperature", "Air Temperature")) stations_data else prec_stations_data
+      stations_info <- if (is_temp_param(input$parameter)) stations_data else prec_stations_data
       st_meta <- stations_info %>%
         filter(ID == sid) %>%
         head(1)
@@ -499,7 +535,7 @@ function(input, output, session) {
     # Broadcast the current state
     st_meta <- NULL
     if (!is.null(sid)) {
-      stations_info <- if (param %in% c("Temperature", "Air Temperature")) stations_data else prec_stations_data
+      stations_info <- if (is_temp_param(param)) stations_data else prec_stations_data
       st_meta <- stations_info %>%
         filter(ID == sid) %>%
         head(1)
@@ -518,26 +554,6 @@ function(input, output, session) {
       yearStart = year_range[1],
       yearEnd = year_range[2]
     ))
-  })
-
-  # Reactive observer to update the plot when month or year inputs change
-  observe({
-    req(input$month, input$year_range) # Ensure month and year range inputs are provided
-
-    station_id <- selected_station_id()
-    month <- input$month
-    param <- input$parameter
-    y_label <- if (param == "Temperature") "Temperature (°C)" else "Precipitation (mm)"
-    title <- if (param == "Temperature") "Daily Mean Temperature" else "Total Precipitation"
-
-    # Update the time series plot when month or year inputs change
-    output$time_series_plot <- renderPlotly({
-      is_mag <- plot_magnified() # Force redraw when magnification changes
-      data <- time_series_data() # Get the filtered time series data
-      req(nrow(data) > 0) # Ensure there is data to plot
-
-      render_time_series_plot(data, station_id, month, y_label, title)
-    })
   })
 
 
@@ -611,7 +627,7 @@ function(input, output, session) {
     param <- input$parameter
 
     # Define legend properties matching the map logic
-    if (param %in% c("Temperature", "Air Temperature")) {
+    if (is_temp_param(param)) {
       bins <- c(-Inf, -40, -30, -20, -15, -12.5, -10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30, 35, 40, Inf)
       blues <- colorRampPalette(c("#053061", "#4393c3", "#d1e5f0"))(10)
       reds <- colorRampPalette(c("#fff7bc", "#fdae61", "#d73027", "#67001f"))(15)
@@ -688,7 +704,7 @@ function(input, output, session) {
       # Create a dynamic filename based on station ID and month
       station_id <- selected_station_id()
       month <- input$month
-      info <- if (input$parameter %in% c("Temperature", "Air Temperature")) tavg_meta else prec_meta
+      info <- if (is_temp_param(input$parameter)) tavg_meta else prec_meta
       paste0(info$NAME[info$ID == station_id], "_", station_id, "_", month, ".csv")
     },
     content = function(file) {

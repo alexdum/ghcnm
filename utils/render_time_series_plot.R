@@ -1,47 +1,126 @@
-render_time_series_plot <- function(data, station_id, month, y_label = "Temperature (°C)", title_prefix = "Daily Mean Temperature") {
-  # determine station name from one of the metadata files
-  # Since this is a utility function, it might not see tavg_meta easily if not in global scope or passed.
-  # server.R sources this with local=T, so it sees tavg_meta.
-  # But we should look in both or pass the name.
-  # For simplicity, let's try to find it in tavg_meta first, then prec_meta.
+evaluate_ghcnm_trend <- function(data, min_years = 24L, min_span = 30L, min_completeness = 0.80, max_gap_years = 10L) {
+  valid_data <- data[!is.na(data$YEAR) & !is.na(data$VALUE) & is.finite(data$VALUE), , drop = FALSE]
+  valid_data$YEAR <- as.integer(valid_data$YEAR)
+  valid_data <- valid_data[order(valid_data$YEAR), , drop = FALSE]
 
-  station_name <- NA
-  if (station_id %in% tavg_meta$ID) {
-    station_name <- tavg_meta$NAME[tavg_meta$ID == station_id]
-  } else if (exists("prec_meta") && station_id %in% prec_meta$ID) {
-    station_name <- prec_meta$NAME[prec_meta$ID == station_id]
+  valid_years <- sort(unique(valid_data$YEAR))
+  n_valid <- length(valid_years)
+  if (n_valid == 0L) {
+    return(list(
+      valid_data = valid_data,
+      n_valid = 0L,
+      year_min = NA_integer_,
+      year_max = NA_integer_,
+      obs_span = 0L,
+      completeness = 0,
+      max_gap = NA_integer_,
+      eligible = FALSE,
+      linear_model = NULL,
+      slope_yr = NA_real_,
+      slope_decade = NA_real_
+    ))
   }
 
-  if (is.na(station_name)) {
-    # Fallback if both fail or only one loaded yet
-    # stop("Station ID not found in metadata.")
+  year_min <- min(valid_years)
+  year_max <- max(valid_years)
+  obs_span <- year_max - year_min + 1L
+  completeness <- n_valid / obs_span
+  max_gap <- if (n_valid >= 2L) max(diff(valid_years) - 1L) else 0L
+
+  eligible <- isTRUE(
+    n_valid >= min_years &&
+      obs_span >= min_span &&
+      completeness >= min_completeness &&
+      max_gap <= max_gap_years
+  )
+
+  linear_model <- NULL
+  slope_yr <- NA_real_
+  slope_decade <- NA_real_
+  if (eligible) {
+    linear_model <- lm(VALUE ~ YEAR, data = valid_data)
+    slope_yr <- unname(coef(linear_model)["YEAR"])
+    slope_decade <- slope_yr * 10
+  }
+
+  list(
+    valid_data = valid_data,
+    n_valid = n_valid,
+    year_min = year_min,
+    year_max = year_max,
+    obs_span = obs_span,
+    completeness = completeness,
+    max_gap = max_gap,
+    eligible = eligible,
+    linear_model = linear_model,
+    slope_yr = slope_yr,
+    slope_decade = slope_decade
+  )
+}
+
+extract_ghcnm_unit <- function(y_label) {
+  m <- regmatches(y_label, regexpr("\\(([^)]+)\\)", y_label))
+  if (length(m) == 1L && nzchar(m)) {
+    return(trimws(gsub("^\\(|\\)$", "", m)))
+  }
+  ""
+}
+
+render_time_series_plot <- function(data, station_id, month, y_label = "Temperature (°C)", title_prefix = "Monthly Mean Temperature") {
+  station_name <- NA_character_
+  if (exists("tavg_meta") && station_id %in% tavg_meta$ID) {
+    station_name <- tavg_meta$NAME[tavg_meta$ID == station_id][1]
+  } else if (exists("prec_meta") && station_id %in% prec_meta$ID) {
+    station_name <- prec_meta$NAME[prec_meta$ID == station_id][1]
+  }
+
+  if (is.na(station_name) || !nzchar(station_name)) {
     station_name <- "Unknown Station"
   }
 
-  # Fit a linear model to calculate the slope
-  linear_model <- lm(VALUE ~ YEAR, data = data)
-  slope <- coef(linear_model)["YEAR"]
+  trend_info <- evaluate_ghcnm_trend(data)
+  valid_data <- trend_info$valid_data
 
-  # Complete the dataset with missing years to break the line on the plot
-  if (nrow(data) > 0) {
-    all_years <- data.frame(YEAR = min(data$YEAR, na.rm = TRUE):max(data$YEAR, na.rm = TRUE))
-    data <- merge(all_years, data, by = "YEAR", all.x = TRUE)
+  # Complete the series with missing years so Plotly breaks across data gaps
+  if (nrow(valid_data) > 0L) {
+    all_years <- data.frame(YEAR = seq.int(trend_info$year_min, trend_info$year_max))
+    plot_data <- merge(all_years, valid_data, by = "YEAR", all.x = TRUE)
+  } else {
+    plot_data <- valid_data
   }
-  
-  # Calculate trend line values for all years
-  data$Trend <- predict(linear_model, newdata = data)
 
-  # Create the title with slope
-  title_text <- paste(
-    month, min(data$YEAR), max(data$YEAR), "-", station_name, station_id
-  )
+  if (trend_info$eligible) {
+    plot_data$Trend <- predict(trend_info$linear_model, newdata = plot_data)
+  }
 
-  # Determine color based on parameter type (inferred from label)
+  title_text <- if (nrow(valid_data) > 0L) {
+    paste0(title_prefix, " - ", month, " ", trend_info$year_min, "–", trend_info$year_max, " - ", station_name, " ", station_id)
+  } else {
+    paste0(title_prefix, " - ", month, " - ", station_name, " ", station_id)
+  }
+
   # Simple heuristic: if y_label contains "Precipitation", use blue, else red.
   line_color <- if (grepl("Precipitation", y_label)) "blue" else "red"
+  unit_str <- extract_ghcnm_unit(y_label)
+  unit_suffix <- if (nzchar(unit_str)) paste0(" ", unit_str) else ""
+  mean_val <- if (nrow(valid_data) > 0L) round(mean(valid_data$VALUE, na.rm = TRUE), 1) else NA_real_
+
+  annotation_text <- if (trend_info$eligible) {
+    paste0(
+      "Slope: ", sprintf("%+.2f", trend_info$slope_decade), unit_suffix, "/decade (",
+      sprintf("%+.3f", trend_info$slope_yr), unit_suffix, "/yr) | Mean: ",
+      mean_val, unit_suffix
+    )
+  } else {
+    paste0(
+      "Trend suppressed (requires >=24 yrs, >=30-yr span, >=80% coverage, <=10-yr gap; ",
+      trend_info$n_valid, " yrs, ", round(trend_info$completeness * 100), "% coverage) | Mean: ",
+      mean_val, unit_suffix
+    )
+  }
 
   # Main plot
-  plot <- plot_ly(data,
+  plot <- plot_ly(plot_data,
     x = ~YEAR, y = ~VALUE, type = "scatter", mode = "lines",
     name = "Value", # Set neutral name
     line = list(color = line_color),
@@ -93,22 +172,26 @@ render_time_series_plot <- function(data, station_id, month, y_label = "Temperat
           xref = "paper",
           yref = "paper",
           showarrow = FALSE,
-          text = paste("Slope:", round(slope, 3), units = strsplit(y_label, " ")[[1]][2], "/year | Mean: ", round(mean(data$VALUE, na.rm = TRUE), 1), strsplit(y_label, " ")[[1]][2]),
+          text = annotation_text,
           xanchor = "center",
           yanchor = "top",
           font = list(size = 11, color = "black")
         )
       )
-    ) %>%
-    add_trace(
-      x = ~YEAR,
-      y = ~Trend,
-      mode = "lines",
-      name = "Linear Trend",
-      line = list(color = "gray"),
-      connectgaps = FALSE,
-      hoverinfo = "x+y" # Display only x and y without custom text
     )
+
+  if (trend_info$eligible) {
+    plot <- plot %>%
+      add_trace(
+        x = ~YEAR,
+        y = ~Trend,
+        mode = "lines",
+        name = "Linear Trend",
+        line = list(color = "gray"),
+        connectgaps = FALSE,
+        hoverinfo = "x+y" # Display only x and y without custom text
+      )
+  }
 
 
   # Configure the mode bar to show only the download button
