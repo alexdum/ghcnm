@@ -6,19 +6,117 @@ function(input, output, session) {
 
   # Show loading spinner on startup until stations are drawn
   session$sendCustomMessage("freezeUI", list(text = "Loading stations..."))
+
+  # Reactive values to store the selected, previous, and deep-link pending state
+  selected_station_id <- reactiveVal(NULL)
+  previous_station_id <- reactiveVal(NULL)
+  pending_map_fly <- reactiveVal(NULL)
+  pending_url_param <- reactiveVal(NULL)
+  url_param_token <- reactiveVal(0L)
+  pending_url_month <- reactiveVal(NULL)
+  url_month_token <- reactiveVal(0L)
+  pending_url_years <- reactiveVal(NULL)
+  url_years_token <- reactiveVal(0L)
+
+  schedule_post_flush <- function(fn, delay_sec) {
+    current_session <- session
+    run_later <- function() {
+      if (!is.null(current_session) && is.function(current_session$isClosed) && current_session$isClosed()) {
+        return(invisible(NULL))
+      }
+      later::later(function() {
+        tryCatch({
+          if (!is.null(current_session) && is.function(current_session$isClosed) && current_session$isClosed()) {
+            return(invisible(NULL))
+          }
+          shiny::withReactiveDomain(current_session, shiny::isolate(fn()))
+        }, error = function(e) NULL)
+      }, delay_sec)
+    }
+    if (!is.null(current_session) && is.function(current_session$onFlushed)) {
+      current_session$onFlushed(run_later, once = TRUE)
+    } else {
+      run_later()
+    }
+  }
+
+  arm_token_rv <- function(val_rv, tok_rv, value, clear_value, duration = 3.0) {
+    tok <- isolate(tok_rv()) + 1L
+    tok_rv(tok)
+    val_rv(value)
+    schedule_post_flush(function() {
+      if (identical(isolate(tok_rv()), tok)) {
+        val_rv(clear_value)
+      }
+    }, duration)
+  }
+
+  clear_token_rv <- function(val_rv, tok_rv, clear_value = NULL) {
+    tok_rv(isolate(tok_rv()) + 1L)
+    val_rv(clear_value)
+  }
+
+  effective_param <- function() {
+    p <- pending_url_param()
+    if (!is.null(p) && length(p) > 0 && !is.na(p[1]) && nzchar(trimws(as.character(p[1])))) {
+      return(as.character(p[1]))
+    }
+    if (!is.null(input$parameter) && length(input$parameter) > 0 && !is.na(input$parameter[1]) && nzchar(trimws(as.character(input$parameter[1])))) {
+      return(as.character(input$parameter[1]))
+    }
+    "Temperature"
+  }
+
+  effective_month <- function() {
+    m <- pending_url_month()
+    if (!is.null(m) && length(m) > 0 && !is.na(m[1]) && nzchar(trimws(as.character(m[1])))) {
+      return(as.character(m[1]))
+    }
+    if (!is.null(input$month) && length(input$month) > 0 && !is.na(input$month[1]) && nzchar(trimws(as.character(input$month[1])))) {
+      return(as.character(input$month[1]))
+    }
+    month.name[1]
+  }
+
+  effective_year_range <- function() {
+    y <- pending_url_years()
+    if (!is.null(y) && length(y) >= 2 && !any(is.na(y[1:2]))) {
+      return(as.numeric(y[1:2]))
+    }
+    yr_inp <- input$year_range
+    if (!is.null(yr_inp) && length(yr_inp) >= 2 && !any(is.na(yr_inp[1:2]))) {
+      return(as.numeric(yr_inp[1:2]))
+    }
+    c(1961, max(stations_data$last_year, na.rm = TRUE))
+  }
+
+  lookup_station_meta <- function(sid, param) {
+    if (is.null(sid) || length(sid) == 0 || is.na(sid[1]) || !nzchar(trimws(as.character(sid[1])))) {
+      return(NULL)
+    }
+    primary <- if (is_temp_param(param)) stations_data else prec_stations_data
+    res <- primary %>% filter(ID == sid) %>% head(1)
+    if (nrow(res) > 0) return(res)
+    fallback <- if (is_temp_param(param)) prec_stations_data else stations_data
+    fallback %>% filter(ID == sid) %>% head(1)
+  }
+
   # Reactive expression to filter the Parquet data by year and month
   filtered_parquet_data <- reactive({
-    req(input$month, input$year_range)
-    month_number <- match(input$month, month.name)
+    eff_month <- effective_month()
+    eff_years <- effective_year_range()
+    eff_param <- effective_param()
+    req(eff_month, eff_years, length(eff_years) >= 2)
+    month_number <- match(eff_month, month.name)
     req(!is.na(month_number))
 
-    yr_start <- as.integer(input$year_range[1])
-    yr_end <- as.integer(input$year_range[2])
+    yr_start <- as.integer(eff_years[1])
+    yr_end <- as.integer(eff_years[2])
     span_years <- max(1L, yr_end - yr_start + 1L)
     min_years <- max(1L, as.integer(ceiling(0.80 * span_years)))
 
-    # Determine which dataset to use based on input parameter
-    dataset <- if (is_temp_param(input$parameter)) tavg_dataset else prec_dataset
+    # Determine which dataset to use based on active parameter
+    dataset <- if (is_temp_param(eff_param)) tavg_dataset else prec_dataset
 
     # Filter the dataset using arrow's dplyr interface and enforce >=80% completeness
     dataset %>%
@@ -40,32 +138,30 @@ function(input, output, session) {
   # Reactive expression to filter the stations based on year range and Parquet data
   filtered_stations <- reactive({
     filtered_data <- filtered_parquet_data()
+    eff_years <- effective_year_range()
+    eff_param <- effective_param()
     # Determine which station metadata to use
-    stations_info <- if (is_temp_param(input$parameter)) stations_data else prec_stations_data
+    stations_info <- if (is_temp_param(eff_param)) stations_data else prec_stations_data
 
     # Join filtered data with station data
     stations_info %>%
       filter(
-        first_year <= input$year_range[1],
-        last_year >= input$year_range[2],
+        first_year <= eff_years[1],
+        last_year >= eff_years[2],
         ID %in% filtered_data$ID
       ) %>%
       left_join(filtered_data, by = "ID")
   })
 
   output$map_title <- renderText({
-    paste("Multiannual mean:", input$year_range[1], "to", input$year_range[2])
+    yr <- effective_year_range()
+    paste("Multiannual mean:", yr[1], "to", yr[2])
   })
 
   # Set the initial view for the map
   initial_lng <- 5 # mean(stations_data$LONGITUDE, na.rm = TRUE)
   initial_lat <- mean(stations_data$LATITUDE, na.rm = TRUE)
   initial_zoom <- 2
-
-
-  # Reactive values to store the selected and previous station IDs
-  selected_station_id <- reactiveVal(NULL)
-  previous_station_id <- reactiveVal(NULL)
 
   # Reactive values for map state
   style_change_trigger <- reactiveVal(0) # Triggers redraw after style change
@@ -162,14 +258,14 @@ function(input, output, session) {
           if (!is.null(current_session) && is.function(current_session$isClosed) && current_session$isClosed()) {
             return(invisible(NULL))
           }
-          shiny::withReactiveDomain(current_session, {
-            current_basemap <- isolate(input$basemap)
+          shiny::withReactiveDomain(current_session, shiny::isolate({
+            current_basemap <- input$basemap
             if (is.null(current_basemap) || current_basemap != selected_basemap) {
               return()
             }
-            apply_label_visibility(maplibre_proxy("station_map"), isolate(input$show_labels))
-            style_change_trigger(isolate(style_change_trigger()) + 1)
-          })
+            apply_label_visibility(maplibre_proxy("station_map"), input$show_labels)
+            style_change_trigger(style_change_trigger() + 1)
+          }))
         }, error = function(e) NULL)
       }, delay = 0.35)
     } else if (basemap == "sentinel") {
@@ -183,8 +279,8 @@ function(input, output, session) {
           if (!is.null(current_session) && is.function(current_session$isClosed) && current_session$isClosed()) {
             return(invisible(NULL))
           }
-          shiny::withReactiveDomain(current_session, {
-            current_basemap <- isolate(input$basemap)
+          shiny::withReactiveDomain(current_session, shiny::isolate({
+            current_basemap <- input$basemap
             if (is.null(current_basemap) || current_basemap != selected_basemap) {
               return()
             }
@@ -206,10 +302,10 @@ function(input, output, session) {
               )
             }
 
-            apply_label_visibility(maplibre_proxy("station_map"), isolate(input$show_labels))
+            apply_label_visibility(maplibre_proxy("station_map"), input$show_labels)
             stations_before_id("waterway_line_label")
-            style_change_trigger(isolate(style_change_trigger()) + 1)
-          })
+            style_change_trigger(style_change_trigger() + 1)
+          }))
         }, error = function(e) NULL)
       }, delay = 0.5)
     }
@@ -237,11 +333,66 @@ function(input, output, session) {
           if (!is.null(current_session) && is.function(current_session$isClosed) && current_session$isClosed()) {
             return(invisible(NULL))
           }
-          map_initialized(TRUE)
+          shiny::withReactiveDomain(current_session, shiny::isolate({
+            map_initialized(TRUE)
+          }))
         }, error = function(e) NULL)
       }, delay = 0.5)
     }
   })
+
+  # Consume deferred map fly-to once MapLibre is ready
+  observe({
+    req(map_initialized())
+    fly <- pending_map_fly()
+    req(!is.null(fly))
+    pending_map_fly(NULL)
+    maplibre_proxy("station_map") %>%
+      fly_to(center = c(fly$lon, fly$lat), zoom = 6)
+  })
+
+  # Release startup URL echo guards when browser confirms or user overrides
+  observeEvent(input$parameter, {
+    pend_p <- isolate(pending_url_param())
+    if (!is.null(pend_p) && nzchar(pend_p)) {
+      if (identical(input$parameter, pend_p)) {
+        clear_token_rv(pending_url_param, url_param_token, NULL)
+      } else if (identical(input$parameter, "Temperature")) {
+        updateSelectInput(session, "parameter", selected = pend_p)
+      } else {
+        clear_token_rv(pending_url_param, url_param_token, NULL)
+      }
+    }
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$month, {
+    pend_m <- isolate(pending_url_month())
+    if (!is.null(pend_m) && nzchar(pend_m)) {
+      if (identical(input$month, pend_m)) {
+        clear_token_rv(pending_url_month, url_month_token, NULL)
+      } else if (identical(input$month, "January")) {
+        updateSelectInput(session, "month", selected = pend_m)
+      } else {
+        clear_token_rv(pending_url_month, url_month_token, NULL)
+      }
+    }
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$year_range, {
+    pend_y <- isolate(pending_url_years())
+    if (!is.null(pend_y) && length(pend_y) >= 2 && !any(is.na(pend_y))) {
+      cur_y <- suppressWarnings(as.integer(input$year_range))
+      tgt_y <- suppressWarnings(as.integer(pend_y[1:2]))
+      def_y <- c(1961L, as.integer(max(stations_data$last_year, na.rm = TRUE)))
+      if (length(cur_y) == 2 && identical(cur_y, tgt_y)) {
+        clear_token_rv(pending_url_years, url_years_token, NULL)
+      } else if (length(cur_y) == 2 && identical(cur_y, def_y)) {
+        updateSliderInput(session, "year_range", value = tgt_y)
+      } else {
+        clear_token_rv(pending_url_years, url_years_token, NULL)
+      }
+    }
+  }, ignoreInit = TRUE)
 
   # Render Stations Layer (MapLibre)
   # Render Stations Layer (MapLibre) - DATA UPDATE ONLY
@@ -254,7 +405,7 @@ function(input, output, session) {
     session$sendCustomMessage("freezeUI", list(text = "Loading stations..."))
 
     data <- filtered_stations()
-    param <- input$parameter
+    param <- effective_param()
     # Note: We do NOT depend on selected_station_id() here to avoid full redraws on click
 
     # Define palettes and units
@@ -279,7 +430,7 @@ function(input, output, session) {
 
     # Prepare Data for MapLibre
     # Vectorized popup HTML (replaces per-row mapply+generateLabel)
-    yr <- input$year_range
+    yr <- effective_year_range()
     span_years <- max(1L, as.integer(yr[2]) - as.integer(yr[1]) + 1L)
     popup_html <- paste0(
       "Station: ", data$NAME, "<br>",
@@ -363,15 +514,18 @@ function(input, output, session) {
   # Reactive expression to retrieve time series data for the selected station and year/month inputs
   # Reactive expression to retrieve time series data for the selected station and year/month inputs
   time_series_data <- reactive({
+    eff_month <- effective_month()
+    eff_years <- effective_year_range()
+    eff_param <- effective_param()
     req(selected_station_id()) # Ensure a station is clicked
-    req(input$month, input$year_range)
+    req(eff_month, eff_years, length(eff_years) >= 2)
 
     station_id <- selected_station_id()
-    month_num <- match(input$month, month.name)
+    month_num <- match(eff_month, month.name)
     req(!is.na(month_num))
-    yr_start <- as.integer(input$year_range[1])
-    yr_end <- as.integer(input$year_range[2])
-    dataset <- if (is_temp_param(input$parameter)) tavg_dataset else prec_dataset
+    yr_start <- as.integer(eff_years[1])
+    yr_end <- as.integer(eff_years[2])
+    dataset <- if (is_temp_param(eff_param)) tavg_dataset else prec_dataset
 
     # Filter the dataset based on selected station, month, and year range
     dataset %>%
@@ -394,15 +548,14 @@ function(input, output, session) {
     req(nrow(data) > 0) # Ensure there is data to plot
 
     station_id <- selected_station_id()
-    month <- input$month
-    is_temp <- is_temp_param(input$parameter)
+    month <- effective_month()
+    is_temp <- is_temp_param(effective_param())
     y_label <- if (is_temp) "Temperature (°C)" else "Precipitation (mm)"
     title <- if (is_temp) "Monthly Mean Temperature" else "Total Precipitation"
 
     render_time_series_plot(data, station_id, month, y_label, title)
   })
 
-  # Observe to handle click events on the map markers and update plot accordingly
   # Observe to handle click events on the map markers and update plot accordingly
   observeEvent(input$station_map_feature_click, {
     clicked <- input$station_map_feature_click
@@ -420,6 +573,7 @@ function(input, output, session) {
 
       print(paste("Selected ID:", click_id))
       if (!is.null(click_id)) {
+        pending_map_fly(NULL)
         selected_station_id(click_id)
 
         # Center map on clicked station, preserving current zoom
@@ -460,37 +614,117 @@ function(input, output, session) {
     params <- parse_url_params(query)
 
     if (length(params) > 0) {
+      slugify_ghcnm <- function(x) {
+        s <- tolower(iconv(as.character(x), from = "UTF-8", to = "ASCII//TRANSLIT", sub = ""))
+        s <- gsub("[^a-z0-9]+", "-", s)
+        gsub("^-+|-+$", "", s)
+      }
+
+      find_station_in_df <- function(df, station_ref, country_ref = NULL) {
+        if (is.null(df) || nrow(df) == 0 || is.null(station_ref) || !nzchar(trimws(station_ref))) {
+          return(df[0, , drop = FALSE])
+        }
+        ref <- trimws(as.character(station_ref[1]))
+        match_pool <- function(pool) {
+          if (is.null(pool) || nrow(pool) == 0) return(pool[0, , drop = FALSE])
+          m <- pool[toupper(trimws(as.character(pool$ID))) == toupper(ref), , drop = FALSE]
+          if (nrow(m) > 0) return(m)
+          m <- pool[tolower(trimws(as.character(pool$NAME))) == tolower(ref), , drop = FALSE]
+          if (nrow(m) > 0) return(m)
+          ref_slug <- slugify_ghcnm(ref)
+          if (nzchar(ref_slug)) {
+            pool_slugs <- vapply(pool$NAME, slugify_ghcnm, character(1))
+            m <- pool[pool_slugs == ref_slug, , drop = FALSE]
+            if (nrow(m) > 0) return(m)
+          }
+          pool[0, , drop = FALSE]
+        }
+
+        if (!is.null(country_ref) && nzchar(trimws(as.character(country_ref[1]))) && "Country" %in% names(df)) {
+          c_ref <- trimws(as.character(country_ref[1]))
+          c_slug <- slugify_ghcnm(c_ref)
+          c_mask <- tolower(trimws(as.character(df$Country))) == tolower(c_ref) |
+            vapply(df$Country, slugify_ghcnm, character(1)) == c_slug
+          res_c <- match_pool(df[which(c_mask), , drop = FALSE])
+          if (nrow(res_c) > 0) return(res_c)
+        }
+        match_pool(df)
+      }
+
       # 1. Parameter
-      if (!is.null(params$parameter)) {
-        updateSelectInput(session, "parameter", selected = params$parameter)
+      req_param <- if (!is.null(params$parameter) && nzchar(trimws(as.character(params$parameter[1])))) {
+        if (is_temp_param(params$parameter[1])) "Temperature" else if (identical(trimws(as.character(params$parameter[1])), "Precipitation")) "Precipitation" else "Temperature"
+      } else {
+        "Temperature"
       }
 
       # 2. Month
-      if (!is.null(params$month)) {
-        updateSelectInput(session, "month", selected = params$month)
+      if (!is.null(params$month) && params$month[1] %in% month.name) {
+        req_month <- as.character(params$month[1])
+        if (!identical(req_month, "January")) {
+          arm_token_rv(pending_url_month, url_month_token, req_month, NULL, 3.0)
+        }
+        updateSelectInput(session, "month", selected = req_month)
       }
 
-      # 3. Year Range
+      # 3. Resolve station first (switching to Precipitation automatically for precip-only stations)
+      matched_row <- NULL
+      if (!is.null(params$station) && nzchar(trimws(as.character(params$station[1])))) {
+        primary_df <- if (is_temp_param(req_param)) stations_data else prec_stations_data
+        other_df <- if (is_temp_param(req_param)) prec_stations_data else stations_data
+        m_primary <- find_station_in_df(primary_df, params$station, params$country)
+        if (nrow(m_primary) > 0) {
+          matched_row <- m_primary[1, , drop = FALSE]
+        } else {
+          m_other <- find_station_in_df(other_df, params$station, params$country)
+          if (nrow(m_other) > 0) {
+            matched_row <- m_other[1, , drop = FALSE]
+            req_param <- if (is_temp_param(req_param)) "Precipitation" else "Temperature"
+          }
+        }
+      }
+
+      if (!identical(req_param, "Temperature")) {
+        arm_token_rv(pending_url_param, url_param_token, req_param, NULL, 3.0)
+      }
+      updateSelectInput(session, "parameter", selected = req_param)
+
+      # 4. Year Range
+      max_yr_ui <- as.integer(max(stations_data$last_year, na.rm = TRUE))
+      def_years <- c(1961L, max_yr_ui)
+      req_years <- NULL
       if (!is.null(params$start) && !is.null(params$end)) {
-        updateSliderInput(session, "year_range", value = c(as.numeric(params$start), as.numeric(params$end)))
+        y1 <- suppressWarnings(as.integer(params$start))
+        y2 <- suppressWarnings(as.integer(params$end))
+        if (!is.na(y1) && !is.na(y2)) {
+          if (y1 > y2) {
+            tmp <- y1; y1 <- y2; y2 <- tmp
+          }
+          req_years <- c(y1, y2)
+        }
+      } else if (!is.null(matched_row) && nrow(matched_row) > 0) {
+        s_y1 <- suppressWarnings(as.integer(matched_row$first_year[1]))
+        s_y2 <- suppressWarnings(as.integer(matched_row$last_year[1]))
+        if (!is.na(s_y1) && !is.na(s_y2) && s_y1 <= s_y2) {
+          req_years <- c(s_y1, s_y2)
+        }
       }
 
-      # 4. Station Selection
-      if (!is.null(params$station)) {
-        station_ref <- params$station
-        current_session <- session
-        shinyjs::delay(1000, {
-          tryCatch({
-            if (!is.null(current_session) && is.function(current_session$isClosed) && current_session$isClosed()) {
-              return(invisible(NULL))
-            }
-            stations_info <- if (is_temp_param(input$parameter)) stations_data else prec_stations_data
-            match <- stations_info %>% filter(ID == station_ref | NAME == station_ref)
-            if (nrow(match) > 0) {
-              selected_station_id(match$ID[1])
-            }
-          }, error = function(e) NULL)
-        })
+      if (!is.null(req_years)) {
+        if (!identical(as.integer(req_years), def_years)) {
+          arm_token_rv(pending_url_years, url_years_token, req_years, NULL, 3.0)
+        }
+        updateSliderInput(session, "year_range", value = req_years)
+      }
+
+      # 5. Station Selection & deferred map centering
+      if (!is.null(matched_row) && nrow(matched_row) > 0) {
+        selected_station_id(matched_row$ID[1])
+        lon_val <- suppressWarnings(as.numeric(matched_row$LONGITUDE[1]))
+        lat_val <- suppressWarnings(as.numeric(matched_row$LATITUDE[1]))
+        if (is.finite(lon_val) && is.finite(lat_val)) {
+          pending_map_fly(list(lon = lon_val, lat = lat_val))
+        }
       }
     }
     url_initialized(TRUE)
@@ -499,13 +733,10 @@ function(input, output, session) {
   # Helper: Broadcast current state to parent page
   broadcast_state <- function() {
     sid <- selected_station_id()
-    st_meta <- NULL
-    if (!is.null(sid)) {
-      stations_info <- if (is_temp_param(input$parameter)) stations_data else prec_stations_data
-      st_meta <- stations_info %>%
-        filter(ID == sid) %>%
-        head(1)
-    }
+    eff_param <- effective_param()
+    eff_month <- effective_month()
+    eff_years <- effective_year_range()
+    st_meta <- lookup_station_meta(sid, eff_param)
 
     station_id <- if (!is.null(st_meta) && nrow(st_meta) > 0) as.character(st_meta$ID) else NULL
     station_name <- if (!is.null(st_meta) && nrow(st_meta) > 0) as.character(st_meta$NAME) else NULL
@@ -515,10 +746,10 @@ function(input, output, session) {
       station = station_id,
       stationName = station_name,
       country = country,
-      parameter = input$parameter,
-      month = input$month,
-      yearStart = input$year_range[1],
-      yearEnd = input$year_range[2]
+      parameter = eff_param,
+      month = eff_month,
+      yearStart = eff_years[1],
+      yearEnd = eff_years[2]
     ))
   }
 
@@ -526,20 +757,14 @@ function(input, output, session) {
   observe({
     # Depend on all state variables that should trigger a broadcast
     sid <- selected_station_id()
-    param <- input$parameter
-    month <- input$month
-    year_range <- input$year_range
+    param <- effective_param()
+    month <- effective_month()
+    year_range <- effective_year_range()
 
     req(url_initialized())
 
     # Broadcast the current state
-    st_meta <- NULL
-    if (!is.null(sid)) {
-      stations_info <- if (is_temp_param(param)) stations_data else prec_stations_data
-      st_meta <- stations_info %>%
-        filter(ID == sid) %>%
-        head(1)
-    }
+    st_meta <- lookup_station_meta(sid, param)
 
     station_id <- if (!is.null(st_meta) && nrow(st_meta) > 0) as.character(st_meta$ID) else NULL
     station_name <- if (!is.null(st_meta) && nrow(st_meta) > 0) as.character(st_meta$NAME) else NULL
@@ -624,7 +849,7 @@ function(input, output, session) {
 
   # Render Map Legend
   output$map_legend <- renderUI({
-    param <- input$parameter
+    param <- effective_param()
 
     # Define legend properties matching the map logic
     if (is_temp_param(param)) {
@@ -703,9 +928,14 @@ function(input, output, session) {
     filename = function() {
       # Create a dynamic filename based on station ID and month
       station_id <- selected_station_id()
-      month <- input$month
-      info <- if (is_temp_param(input$parameter)) tavg_meta else prec_meta
-      paste0(info$NAME[info$ID == station_id], "_", station_id, "_", month, ".csv")
+      month <- effective_month()
+      info <- if (is_temp_param(effective_param())) tavg_meta else prec_meta
+      st_name <- info$NAME[info$ID == station_id][1]
+      if (is.na(st_name) || !nzchar(st_name)) {
+        alt <- if (is_temp_param(effective_param())) prec_meta else tavg_meta
+        st_name <- alt$NAME[alt$ID == station_id][1]
+      }
+      paste0(st_name, "_", station_id, "_", month, ".csv")
     },
     content = function(file) {
       # Get the time series data for the clicked station

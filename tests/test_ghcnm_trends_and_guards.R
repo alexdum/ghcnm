@@ -92,4 +92,49 @@ test_that("ghcnm server.R removes duplicate plot render, uses Monthly Mean Tempe
   expect_true(parsed)
 })
 
+test_that("ghcnm server resolves precipitation-only station deep links and schedules map centering", {
+  suppressPackageStartupMessages({
+    source("global.R")
+    ghcnm_server <- source("server.R")$value
+  })
+
+  # Case A: Host wrapper sends default parameter=Temperature for precip-only Baghlan (AFXLP338776)
+  mock_baghlan <- shiny::MockShinySession$new()
+  mock_baghlan$clientData <- shiny::reactiveValues(
+    url_search = "?country=Afghanistan&parameter=Temperature&month=January&start=1971&end=1981&station=AFXLP338776"
+  )
+  shiny::testServer(ghcnm_server, session = mock_baghlan, {
+    session$flushReact()
+
+    expect_equal(effective_param(), "Precipitation")
+    expect_equal(selected_station_id(), "AFXLP338776")
+    expect_equal(as.integer(effective_year_range()), c(1971L, 1981L))
+    expect_false(is.null(pending_map_fly()))
+    expect_equal(pending_map_fly()$lon, 68.65, tolerance = 0.01)
+    expect_equal(pending_map_fly()$lat, 36.10, tolerance = 0.01)
+
+    # Simulate client initial defaults arriving before updateSelectInput/updateSliderInput echo back
+    session$setInputs(parameter = "Temperature", month = "January", year_range = c(1961, max(stations_data$last_year, na.rm = TRUE)))
+    session$flushReact()
+
+    expect_equal(effective_param(), "Precipitation")
+    expect_equal(selected_station_id(), "AFXLP338776")
+    ts_df <- time_series_data()
+    expect_gt(nrow(ts_df), 0L)
+    expect_true(plot_available())
+  })
+
+  # Case B: Bare ?station=AFXLP338776 without parameter/start/end adopts station's active period & dataset
+  mock_bare <- shiny::MockShinySession$new()
+  mock_bare$clientData <- shiny::reactiveValues(url_search = "?station=AFXLP338776")
+  shiny::testServer(ghcnm_server, session = mock_bare, {
+    session$flushReact()
+
+    expect_equal(effective_param(), "Precipitation")
+    expect_equal(selected_station_id(), "AFXLP338776")
+    expect_equal(as.integer(effective_year_range()), c(1971L, 1981L))
+    expect_true(plot_available())
+  })
+})
+
 cat("ALL GHCNM TREND & SESSION GUARD TESTS PASSED!\n")
